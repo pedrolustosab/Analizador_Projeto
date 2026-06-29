@@ -14,7 +14,8 @@ st.set_page_config(page_title="Executive Command Center", layout="wide", page_ic
 
 st.markdown("""
     <style>
-    #MainMenu, footer, header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    /* header {visibility: hidden;}  <-- APAGUE OU COMENTE ESTA LINHA */
     .stApp { background-color: #f1f5f9; }
     .block-container { padding-top: 2rem !important; max-width: 1600px; }
     [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e2e8f0; }
