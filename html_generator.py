@@ -3,7 +3,6 @@ import json
 def get_html_template(d):
     fmt = lambda x: f"R$ {x/1000:,.1f}k".replace(',', 'X').replace('.', ',').replace('X', '.')
     
-    # 1. Montagem das Linhas do Gantt
     gantt_html = ""
     for t in d['tasks']:
         pad = (t['level'] - 1) * 18
@@ -28,7 +27,6 @@ def get_html_template(d):
             <div class='pct'>{t['pct']}%</div>
         </div>"""
 
-    # 2. Montagem Tabela de Atrasos
     delays_html = ""
     lates = [t for t in d['tasks'] if t['status'] == 'Atrasada' and t['children'] == 0]
     lates.sort(key=lambda x: x['svd'], reverse=True)
@@ -36,7 +34,6 @@ def get_html_template(d):
         delays_html += f"<tr onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td>{t['finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
     if not delays_html: delays_html = "<tr><td colspan='7' style='text-align:center;'>Nenhuma tarefa folha em atraso no momento.</td></tr>"
 
-    # 3. Lógica Financeira e Tabela EVA Hierárquica (Drilldown)
     if d['has_finance']:
         spi_str = f"{d['spi']:.2f}"
         cpi_str = f"{d['cpi']:.2f}"
@@ -95,20 +92,16 @@ def get_html_template(d):
                         <line x1="80" y1="180" x2="1180" y2="180" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="184" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][2])}</text>
                         <line x1="80" y1="100" x2="1180" y2="100" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="104" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][3])}</text>
                         <line x1="80" y1="20" x2="1180" y2="20" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="24" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][4])}</text>
-                        
                         <line x1="{d['chart']['tx']:.1f}" y1="10" x2="{d['chart']['tx']:.1f}" y2="340" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6"/>
                         <rect x="{d['chart']['tx'] - 30:.1f}" y="350" width="60" height="24" rx="4" fill="#f1f5f9"/>
                         <text x="{d['chart']['tx']:.1f}" y="366" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700">HOJE</text>
-                        
                         <polyline points="{d['chart']['pv_pts']}" fill="none" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['ev_pts']}" fill="none" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['ac_pts']}" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['fc_ev']}" fill="none" stroke="#0ea5e9" stroke-width="3" stroke-dasharray="6" stroke-linecap="round"/>
                         <polyline points="{d['chart']['fc_ac']}" fill="none" stroke="#f43f5e" stroke-width="3" stroke-dasharray="6" stroke-linecap="round"/>
-                        
                         <circle cx="1180" cy="{340 - (d['bac'] / d['chart']['m']) * 320:.1f}" r="5" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
                         <text x="1170" y="{340 - (d['bac'] / d['chart']['m']) * 320 - 12:.1f}" text-anchor="end" fill="#0ea5e9" font-size="12" font-weight="700">BAC {fmt(d['bac'])}</text>
-                        
                         <circle cx="1180" cy="{340 - (d['eac'] / d['chart']['m']) * 320:.1f}" r="5" fill="#f43f5e" stroke="#fff" stroke-width="2"/>
                         <text x="1170" y="{340 - (d['eac'] / d['chart']['m']) * 320 - 12:.1f}" text-anchor="end" fill="#f43f5e" font-size="12" font-weight="700">EAC {fmt(d['eac'])}</text>
                     </svg>
@@ -125,103 +118,91 @@ def get_html_template(d):
             <div class='tw' style='margin-top:16px;'><table><thead><tr><th>Estrutura Analítica</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{eva_rows_html}</tbody></table></div>
         """
     else:
-        spi_str = "N/D"
-        cpi_str = "N/D"
-        pct_fin_str = "N/D"
-        fin_warn_bar = ""
-        fin_bar_width = "0%"
-        
-        eva_content = """
-            <div style='text-align:center; padding: 60px 20px; background:#f8fafc; border-radius:16px; border: 2px dashed #cbd5e1; margin-top: 16px;'>
-                <div style='font-size:40px; margin-bottom:16px;'>💸</div>
-                <h3 style='color:#334155; margin:0 0 12px 0; font-size:20px;'>Análise de Custos Indisponível</h3>
-                <p style='color:#64748b; margin:0; font-size:15px;'>Este cronograma (XML) não possui custos alocados nas tarefas.<br>Para habilitar a <b>Curva S</b> e o motor <b>EVM/EVA</b>, insira taxas para os recursos ou custos fixos diretamente no MS Project.</p>
-            </div>
-        """
+        spi_str, cpi_str, pct_fin_str, fin_warn_bar, fin_bar_width = "N/D", "N/D", "N/D", "", "0%"
+        eva_content = "<div style='text-align:center; padding: 60px 20px; background:#f8fafc; border-radius:16px; border: 2px dashed #cbd5e1; margin-top: 16px;'><h3 style='color:#334155;'>Análise Indisponível</h3></div>"
 
     tasks_json = json.dumps(d['tasks'], ensure_ascii=False)
     
-    html = f"""<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
-    <title>Premium XML Dashboard</title>
-    <style>
-        :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7}}
-        *{{box-sizing:border-box}}
-        body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
-        .shell{{max-width:1440px;margin:0 auto;padding:24px}}
-        .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}
-        .hero h1{{margin:8px 0 8px;font-size:32px; letter-spacing: -0.5px;}}
-        .eyebrow{{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#cbd5e1;font-weight:700}}
-        .hero p{{color:#94a3b8; font-size: 15px; margin-top: 0;}}
-        .hero-panel{{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px}}
-        .hero-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
-        .hero-mini{{background:rgba(0,0,0,.2);border-radius:12px;padding:16px}}
-        .hero-mini span{{display:block;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700}}
-        .hero-mini b{{display:block;font-size:24px;margin-top:6px; color:#fff;}}
-        .nav{{position:sticky;top:0;z-index:10;background:rgba(248,250,252,.9);backdrop-filter:blur(12px);padding:16px 0;margin:16px 0 0 0; display:flex; gap: 8px; align-items:center; border-bottom: 1px solid var(--line)}}
-        .nav a,.nav button,button{{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 16px;color:#334155;text-decoration:none;font-size:13px;font-weight:600;cursor:pointer; transition: 0.2s}}
-        .nav a:hover, button:hover {{background: #f1f5f9; border-color: #cbd5e1;}}
-        .section{{background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;margin-top:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.05)}}
-        h2{{margin:0 0 20px 0;font-size:20px; letter-spacing: -0.5px; color: #1e293b;}}
-        .kpis,.eva-grid,.progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
-        .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
-        .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
-        .kpi span,.eva-card span,.progress-card span{{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:700; letter-spacing: 0.5px;}}
-        .kpi span{{text-align:center}}
-        .kpi b{{display:block;text-align:center;font-size:32px;font-weight:600;margin-top:12px; color: var(--ink);}}
-        .eva-card b,.progress-card b{{display:block;font-size:24px;font-weight:600;margin-top:10px; color: var(--ink);}}
-        .kpi small,.eva-card small,.progress-card small{{display:block;margin-top:12px;color:#64748b;font-size:12px}}
-        .kpi small.warn, .kpi small.pos, .kpi small.neg {{font-weight: 600;}}
-        .bar-bg{{height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-top:14px}}
-        .bar-fill{{height:100%;border-radius:999px;background:var(--blue)}}
-        .bar-fill.warnbar{{background:var(--amber)}}
-        .neg{{color:var(--red)!important;font-weight:700}}.pos{{color:var(--green)!important;font-weight:700}}.warn{{color:var(--amber)!important;font-weight:700}}
-        .gantt-tools{{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap; margin-bottom: 20px;}}
-        .gantt-tools input{{border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:320px; font-size: 13px; outline: none; transition: border 0.2s;}}
-        .gantt-tools input:focus{{border-color: var(--blue);}}
-        .gantt,.tw{{overflow-x:auto}}
-        .gantt-row{{display:grid;grid-template-columns:520px 1fr 68px;gap:16px;align-items:center;min-width:1000px;border-bottom:1px solid #f1f5f9;padding:12px 0; transition: background 0.1s}}
-        .gantt-row:hover{{background: #f8fafc;}}
-        .hidden{{display:none!important}}
-        .task{{cursor:pointer; display:flex; align-items:flex-start; flex-direction:column; justify-content: center;}}
-        .fw-bold {{font-weight: 600; color: #1e293b;}}
-        .t-name {{font-size: 14px;}}
-        
-        /* Ajustes das Toggles para sincronia na tabela EVA */
-        .toggle{{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:6px;margin-right:8px;background:#fff; font-size:14px; font-weight: bold; color: #475569; position:absolute; left: -28px; top: 0px;}}
-        .toggle.dot{{border: none; background: #e2e8f0; width: 6px; height: 6px; border-radius: 50%; left: -16px; top: 7px;}}
-        .task > div, .task > span {{position: relative;}}
-        
-        .meta{{font-size:12px;color:#64748b;margin-top:6px}}
-        .linebox{{position:relative;height:36px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;overflow:hidden}}
-        .today{{position:absolute;top:0;bottom:0;width:2px;background:#cbd5e1;z-index:2}}
-        .base{{position:absolute;top:10px;height:4px;border-radius:99px;background:#cbd5e1}}
-        .bar{{position:absolute;top:18px;height:8px;border-radius:99px}}
-        .cur{{background:#0ea5e9}}.donebar{{background:#10b981}}.late{{background:#f43f5e}}.phase{{background:#6366f1}}
-        .bar.milestone{{height:12px!important;width:12px!important;top:12px!important;transform:rotate(45deg);border-radius:3px;background:#334155!important}}
-        .pct{{text-align:right;font-weight:700; font-size:13px; color:#334155}}
-        .tag{{display:inline-flex;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700; margin-left: 6px; letter-spacing: 0.5px;}}
-        .done{{background:#d1fae5;color:#047857}}.planned{{background:#e0f2fe;color:#0369a1}}.late-tag{{background:#ffe4e6;color:#be123c}}
-        
-        /* Tabela EVA Classes */
-        table{{width:100%;border-collapse:collapse;font-size:13px}}
-        th{{text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding:12px 10px; font-weight: 700;}}
-        td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155; transition: background 0.1s;}}
-        tr:hover td{{background: #f8fafc;}}
-        .eva-row:hover td {{background: #f8fafc;}}
-        
-        .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
-        .modal-backdrop.flex{{display:flex}}
-        .modal{{background:white;max-width:800px;width:100%;border-radius:24px;padding:32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);}}
-        .detail-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px; margin-top: 24px;}}
-        .detail-box{{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
-        .detail-label{{font-size:11px;text-transform:uppercase;font-weight:700;color:#64748b; letter-spacing:0.5px;}}
-        .detail-value{{font-weight:700;margin-top:8px; font-size: 16px; color: #0f172a;}}
-        .close{{float:right; background: #f1f5f9; color: #334155; border: none;}}
-        .svg-container {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }}
-        .svg-legend {{ display: flex; gap: 20px; margin-bottom: 24px; justify-content: center; font-size: 13px; font-weight: 600; color: #475569; }}
-        .svg-legend span {{ display: flex; align-items: center; gap: 8px; }}
-        .svg-legend rect {{ rx: 3px; ry: 3px; }}
-    </style>
+    html = f"""<!DOCTYPE html><html lang='pt-BR'>
+    <head>
+        <meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+        <title>Premium XML Dashboard</title>
+        <!-- Injeção do Mermaid JS para o Diagrama PERT -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
+        <script>mermaid.initialize({{startOnLoad:true, theme: 'base', themeVariables: {{ primaryColor: '#f1f5f9' }}}});</script>
+        <style>
+            :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7}}
+            *{{box-sizing:border-box}}
+            body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}}
+            .shell{{max-width:1440px;margin:0 auto;padding:24px}}
+            .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}
+            .hero h1{{margin:8px 0 8px;font-size:32px; letter-spacing: -0.5px;}}
+            .eyebrow{{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#cbd5e1;font-weight:700}}
+            .hero p{{color:#94a3b8; font-size: 15px; margin-top: 0;}}
+            .hero-panel{{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px}}
+            .hero-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+            .hero-mini{{background:rgba(0,0,0,.2);border-radius:12px;padding:16px}}
+            .hero-mini span{{display:block;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700}}
+            .hero-mini b{{display:block;font-size:24px;margin-top:6px; color:#fff;}}
+            .nav{{position:sticky;top:0;z-index:10;background:rgba(248,250,252,.9);backdrop-filter:blur(12px);padding:16px 0;margin:16px 0 0 0; display:flex; gap: 8px; align-items:center; border-bottom: 1px solid var(--line)}}
+            .nav a,.nav button,button{{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 16px;color:#334155;text-decoration:none;font-size:13px;font-weight:600;cursor:pointer; transition: 0.2s}}
+            .nav a:hover, button:hover {{background: #f1f5f9; border-color: #cbd5e1;}}
+            .section{{background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;margin-top:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.05)}}
+            h2{{margin:0 0 20px 0;font-size:20px; letter-spacing: -0.5px; color: #1e293b;}}
+            .kpis,.eva-grid,.progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
+            .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
+            .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
+            .kpi span,.eva-card span,.progress-card span{{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:700; letter-spacing: 0.5px;}}
+            .kpi span{{text-align:center}}
+            .kpi b{{display:block;text-align:center;font-size:32px;font-weight:600;margin-top:12px; color: var(--ink);}}
+            .eva-card b,.progress-card b{{display:block;font-size:24px;font-weight:600;margin-top:10px; color: var(--ink);}}
+            .kpi small,.eva-card small,.progress-card small{{display:block;margin-top:12px;color:#64748b;font-size:12px}}
+            .kpi small.warn, .kpi small.pos, .kpi small.neg {{font-weight: 600;}}
+            .bar-bg{{height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-top:14px}}
+            .bar-fill{{height:100%;border-radius:999px;background:var(--blue)}}
+            .bar-fill.warnbar{{background:var(--amber)}}
+            .neg{{color:var(--red)!important;font-weight:700}}.pos{{color:var(--green)!important;font-weight:700}}.warn{{color:var(--amber)!important;font-weight:700}}
+            .gantt-tools{{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap; margin-bottom: 20px;}}
+            .gantt-tools input{{border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:320px; font-size: 13px; outline: none; transition: border 0.2s;}}
+            .gantt-tools input:focus{{border-color: var(--blue);}}
+            .gantt,.tw{{overflow-x:auto}}
+            .gantt-row{{display:grid;grid-template-columns:520px 1fr 68px;gap:16px;align-items:center;min-width:1000px;border-bottom:1px solid #f1f5f9;padding:12px 0; transition: background 0.1s}}
+            .gantt-row:hover{{background: #f8fafc;}}
+            .hidden{{display:none!important}}
+            .task{{cursor:pointer; display:flex; align-items:flex-start; flex-direction:column; justify-content: center;}}
+            .fw-bold {{font-weight: 600; color: #1e293b;}}
+            .t-name {{font-size: 14px;}}
+            .toggle{{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:6px;margin-right:8px;background:#fff; font-size:14px; font-weight: bold; color: #475569; position:absolute; left: -28px; top: 0px;}}
+            .toggle.dot{{border: none; background: #e2e8f0; width: 6px; height: 6px; border-radius: 50%; left: -16px; top: 7px;}}
+            .task > div, .task > span {{position: relative;}}
+            .meta{{font-size:12px;color:#64748b;margin-top:6px}}
+            .linebox{{position:relative;height:36px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;overflow:hidden}}
+            .today{{position:absolute;top:0;bottom:0;width:2px;background:#cbd5e1;z-index:2}}
+            .base{{position:absolute;top:10px;height:4px;border-radius:99px;background:#cbd5e1}}
+            .bar{{position:absolute;top:18px;height:8px;border-radius:99px}}
+            .cur{{background:#0ea5e9}}.donebar{{background:#10b981}}.late{{background:#f43f5e}}.phase{{background:#6366f1}}
+            .bar.milestone{{height:12px!important;width:12px!important;top:12px!important;transform:rotate(45deg);border-radius:3px;background:#334155!important}}
+            .pct{{text-align:right;font-weight:700; font-size:13px; color:#334155}}
+            .tag{{display:inline-flex;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700; margin-left: 6px; letter-spacing: 0.5px;}}
+            .done{{background:#d1fae5;color:#047857}}.planned{{background:#e0f2fe;color:#0369a1}}.late-tag{{background:#ffe4e6;color:#be123c}}
+            table{{width:100%;border-collapse:collapse;font-size:13px}}
+            th{{text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding:12px 10px; font-weight: 700;}}
+            td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155; transition: background 0.1s;}}
+            tr:hover td{{background: #f8fafc;}}
+            .eva-row:hover td {{background: #f8fafc;}}
+            .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
+            .modal-backdrop.flex{{display:flex}}
+            .modal{{background:white;max-width:800px;width:100%;border-radius:24px;padding:32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);}}
+            .detail-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px; margin-top: 24px;}}
+            .detail-box{{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
+            .detail-label{{font-size:11px;text-transform:uppercase;font-weight:700;color:#64748b; letter-spacing:0.5px;}}
+            .detail-value{{font-weight:700;margin-top:8px; font-size: 16px; color: #0f172a;}}
+            .close{{float:right; background: #f1f5f9; color: #334155; border: none;}}
+            .svg-container {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }}
+            .svg-legend {{ display: flex; gap: 20px; margin-bottom: 24px; justify-content: center; font-size: 13px; font-weight: 600; color: #475569; }}
+            .svg-legend span {{ display: flex; align-items: center; gap: 8px; }}
+            .svg-legend rect {{ rx: 3px; ry: 3px; }}
+        </style>
     </head>
     <body><div class='shell'>
         
@@ -237,9 +218,10 @@ def get_html_template(d):
         </header>
         
         <nav class='nav'>
-            <a href='#prazo'>Resumo do Prazo</a>
+            <a href='#prazo'>Resumo</a>
+            <a href='#pert'>Rede PERT (CPM)</a>
             <a href='#gantt'>Gantt Interativo</a>
-            <a href='#atrasos'>Painel de Atrasos</a>
+            <a href='#atrasos'>Atrasos</a>
             <a href='#eva'>Curva S & EVM</a>
         </nav>
         
@@ -256,6 +238,22 @@ def get_html_template(d):
                 <div class='progress-card'><span>Volume de Tarefas Concluídas</span><b>{d['pct_done']:.1f}%</b><div class='bar-bg'><div class='bar-fill' style='width:{d['pct_done']}%'></div></div></div>
                 <div class='progress-card'><span>Avanço Físico Ponderado</span><b>{d['pct_phys']:.1f}%</b><div class='bar-bg'><div class='bar-fill' style='width:{d['pct_phys']}%'></div></div></div>
                 <div class='progress-card'><span>Consumo Financeiro (Burn rate)</span><b>{pct_fin_str}</b><div class='bar-bg'><div class='bar-fill {fin_warn_bar}' style='width:{fin_bar_width}'></div></div></div>
+            </div>
+        </section>
+
+        <!-- NOVO: SEÇÃO PERT E CAMINHO CRÍTICO -->
+        <section class='section' id='pert'>
+            <h2>Diagrama de Rede (PERT) & Caminho Crítico</h2>
+            <div style="margin-bottom: 24px; font-size: 13px; color: #64748b; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <b>Legenda Analítica:</b><br><br>
+                <span style="display:inline-block; width:14px; height:14px; background:#fee2e2; border: 2px solid #ef4444; border-radius:3px; margin-right:6px; vertical-align: middle;"></span> <b>Caminho Crítico (Risco Máximo):</b> Qualquer atraso nestas tarefas postergará a entrega final do projeto.<br><br>
+                <span style="display:inline-block; width:14px; height:14px; background:#f1f5f9; border: 2px solid #cbd5e1; border-radius:3px; margin-right:6px; vertical-align: middle;"></span> <b>Tarefas com Folga (Slack):</b> Possuem margem de manobra sem impactar a entrega final.
+            </div>
+            
+            <div style="overflow-x: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; display: flex; justify-content: center;">
+                <div class="mermaid">
+                    {d['mermaid_str']}
+                </div>
             </div>
         </section>
         
@@ -296,7 +294,6 @@ def get_html_template(d):
     const byUid = Object.fromEntries(tasks.map(t => [String(t.uid), t]));
     const expanded = new Set();
     
-    // Função utilitária para garantir que tarefas nível 3 só apareçam se o nível 2 E o nível 1 estiverem expandidos
     function isAncestorExpanded(uid) {{
         let p = byUid[uid].parent;
         while (p && p !== "") {{
@@ -317,20 +314,17 @@ def get_html_template(d):
         renderVisibility();
     }}
     
-    // Agora renderiza simultaneamente o Gantt e a tabela EVA
     function renderVisibility(){{
         document.querySelectorAll('.gantt-row, .eva-row').forEach(row => {{
             const uid = row.dataset.uid;
             const parentId = row.dataset.parent;
             
-            // Lógica rigorosa de visibilidade hierárquica
             if (!parentId || parentId === "") {{
                 row.classList.remove('hidden');
             }} else {{
                 row.classList.toggle('hidden', !isAncestorExpanded(uid));
             }}
             
-            // Sincroniza ícones '+' ou '−' no Gantt E na tabela EVA
             if (byUid[uid].children > 0) {{
                 const tgGantt = document.getElementById('tg-'+uid);
                 const tgEva = document.getElementById('tg-eva-'+uid);

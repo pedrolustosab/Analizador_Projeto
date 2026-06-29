@@ -1,6 +1,7 @@
 import pandas as pd
 import xml.etree.ElementTree as ET
 import io
+import re
 
 def parse_xml_to_json(file_bytes):
     tree = ET.parse(io.BytesIO(file_bytes))
@@ -35,15 +36,12 @@ def parse_xml_to_json(file_bytes):
         except:
             row_id = seq
 
-        # Extrai a estrutura analítica (WBS/OutlineNumber)
         out_node = task.find(f'{ns}OutlineNumber')
         out_str = out_node.text if out_node is not None and out_node.text else ""
-        
         try:
             wbs_tuple = tuple(int(x) for x in out_str.split('.') if x.isdigit())
         except:
             wbs_tuple = ()
-            
         if not wbs_tuple:
             wbs_tuple = (999999, seq)
         
@@ -55,6 +53,17 @@ def parse_xml_to_json(file_bytes):
         
         cost, ac_node = task.find(f'{ns}Cost'), task.find(f'{ns}ActualCost')
         b_cost = task.find(f'.//{ns}Baseline/{ns}Cost')
+        
+        # --- NOVO: Mineração para o PERT/CPM ---
+        crit_node = task.find(f'{ns}Critical')
+        is_critical = True if crit_node is not None and crit_node.text == '1' else False
+        
+        preds = []
+        for p_link in task.findall(f'{ns}PredecessorLink'):
+            p_uid = p_link.find(f'{ns}PredecessorUID')
+            if p_uid is not None:
+                preds.append(p_uid.text)
+        # ---------------------------------------
         
         cost_val = float(cost.text) if cost is not None and cost.text else 0.0
         b_cost_val = float(b_cost.text) if b_cost is not None and b_cost.text else cost_val
@@ -70,6 +79,7 @@ def parse_xml_to_json(file_bytes):
             'pct': float(pct.text) if pct is not None and pct.text else 0.0,
             'level': int(lvl.text) if lvl is not None and lvl.text else 1,
             'isMilestone': True if milestone is not None and milestone.text == '1' else False,
+            'is_critical': is_critical, 'preds': preds,
             'bac': b_cost_val, 'ac': float(ac_node.text) if ac_node is not None and ac_node.text else 0.0,
             'owner': ", ".join(assignments.get(uid.text, ["Equipe"]))
         })
@@ -77,9 +87,7 @@ def parse_xml_to_json(file_bytes):
     df = pd.DataFrame(tasks_raw).dropna(subset=['start', 'end'])
     if df.empty: return {}
     
-    # ORDENA PELA WBS E DEPOIS PELO ID
     df = df.sort_values(['wbs_tuple', 'id'])
-    
     df['b_start'] = df['b_start'].fillna(df['start'])
     df['b_end'] = df['b_end'].fillna(df['end'])
     
@@ -110,9 +118,7 @@ def parse_xml_to_json(file_bytes):
     
     lvl1 = df[df['level'] == 1] if not df[df['level'] == 1].empty else df
     bac, pv, ev, ac = lvl1['bac'].sum(), lvl1['pv'].sum(), lvl1['ev'].sum(), lvl1['ac'].sum()
-    
     has_finance = bac > 0
-    
     spi = ev / pv if pv > 0 else 1.0
     cpi = ev / ac if ac > 0 else 1.0
     eac = bac / cpi if cpi > 0 else bac
@@ -142,16 +148,47 @@ def parse_xml_to_json(file_bytes):
             'svd': r['sv_days'], 'status': r['status'], 'level': r['level'],
             'b_left': f"{b_l:.2f}%", 'b_width': f"{b_w:.2f}%", 'a_left': f"{a_l:.2f}%", 'a_width': f"{a_w:.2f}%",
             'tag_cls': tag_cls, 'bar_cls': bar_cls,
-            # NOVOS CAMPOS FINANCEIROS PARA O DRILLDOWN
             'bac': r['bac'], 'pv': r['pv'], 'ev': r['ev'], 'ac': r['ac'],
             'sv': r['ev'] - r['pv'], 'cv': r['ev'] - r['ac'],
             'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0,
             'cpi': r['ev'] / r['ac'] if r['ac'] > 0 else 1.0
         })
 
+    # --- NOVO: GERADOR DE GRÁFICO PERT (MERMAID SYNTAX) ---
+    leaf_df = df[df['children'] == 0] # Filtra apenas tarefas operacionais (folhas)
+    leaf_uids = set(leaf_df['uid'].tolist())
+    
+    mermaid_lines = ["graph LR"] # Renderiza da Esquerda pra Direita (Left-to-Right)
+    for _, r in leaf_df.iterrows():
+        uid = r['uid']
+        # Limpeza do texto para não quebrar a sintaxe do Mermaid
+        safe_name = re.sub(r'[^a-zA-Z0-9À-ÿ\s]', '', r['name'])
+        if len(safe_name) > 30: safe_name = safe_name[:27] + "..."
+        
+        dur = max(0, (r['end'] - r['start']).days)
+        
+        # Formata o nó: Círculos p/ Marcos, Retângulos p/ Tarefas
+        if r['isMilestone']:
+            shape = f"T{uid}(( {safe_name}<br><b>MARCO</b> ))"
+        else:
+            shape = f"T{uid}[ {safe_name}<br>{dur} dias ]"
+            
+        style = ":::crit" if r['is_critical'] else ":::norm"
+        mermaid_lines.append(f"    {shape}{style}")
+        
+    for _, r in leaf_df.iterrows():
+        for p in r['preds']:
+            if p in leaf_uids:
+                # Desenha as setas de dependência
+                mermaid_lines.append(f"    T{p} --> T{r['uid']}")
+                
+    mermaid_lines.append("    classDef crit fill:#fee2e2,stroke:#ef4444,stroke-width:3px,color:#991b1b,font-family:Inter;")
+    mermaid_lines.append("    classDef norm fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,color:#334155,font-family:Inter;")
+    mermaid_str = "\n".join(mermaid_lines)
+    # -------------------------------------------------------
+
     max_money = max(bac, eac) * 1.1
     if max_money <= 0: max_money = 1
-
     def g_x(d): return 80 + ((d - min_date).days / tot_days) * 1100
     def g_y(v): return 340 - (v / max_money) * 320
 
@@ -178,7 +215,7 @@ def parse_xml_to_json(file_bytes):
         "pct_phys": (df['pct'].mean()) if len(df)>0 else 0, "pct_fin": (ac/bac*100) if bac>0 else 0, "pct_done": (len(df[df['status'] == 'Concluída'])/len(df)*100) if len(df)>0 else 0,
         "spi": spi, "cpi": cpi, "bac": bac, "pv": pv, "ev": ev, "ac": ac, "eac": eac, "vac": bac - eac, "sv": ev - pv, "cv": ev - ac,
         "has_finance": has_finance,
-        "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out,
+        "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out, "mermaid_str": mermaid_str,
         "chart": {
             "pv_pts": " ".join(pv_pts), "ev_pts": " ".join(ev_pts), "ac_pts": " ".join(ac_pts), 
             "fc_ev": fc_ev_pts, "fc_ac": fc_ac_pts, 
