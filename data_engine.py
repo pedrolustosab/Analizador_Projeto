@@ -1,4 +1,129 @@
-tasks_out = []
+import pandas as pd
+import xml.etree.ElementTree as ET
+import io
+
+def parse_xml_to_json(file_bytes):
+    tree = ET.parse(io.BytesIO(file_bytes))
+    root = tree.getroot()
+    ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
+    
+    proj_name = root.find(f'.//{ns}Title')
+    proj_name = proj_name.text if proj_name is not None else "Projeto Executivo"
+    
+    sd_node = root.find(f'.//{ns}StatusDate')
+    status_date = pd.to_datetime(sd_node.text).tz_localize(None) if sd_node is not None else pd.Timestamp.now()
+
+    resources = {res.find(f'{ns}UID').text: res.find(f'{ns}Name').text 
+                 for res in root.findall(f'.//{ns}Resource') 
+                 if res.find(f'{ns}UID') is not None and res.find(f'{ns}Name') is not None and res.find(f'{ns}Name').text}
+
+    assignments = {}
+    for ass in root.findall(f'.//{ns}Assignment'):
+        t_uid, r_uid = ass.find(f'{ns}TaskUID'), ass.find(f'{ns}ResourceUID')
+        if t_uid is not None and r_uid is not None and r_uid.text in resources:
+            assignments.setdefault(t_uid.text, []).append(resources[r_uid.text])
+                
+    tasks_raw = []
+    for seq, task in enumerate(root.findall(f'.//{ns}Task')):
+        uid = task.find(f'{ns}UID')
+        name = task.find(f'{ns}Name')
+        if uid is None or name is None or not name.text: continue
+        
+        id_node = task.find(f'{ns}ID')
+        try:
+            row_id = int(id_node.text)
+        except:
+            row_id = seq
+
+        # Extrai a estrutura analítica (WBS/OutlineNumber)
+        out_node = task.find(f'{ns}OutlineNumber')
+        out_str = out_node.text if out_node is not None and out_node.text else ""
+        
+        try:
+            wbs_tuple = tuple(int(x) for x in out_str.split('.') if x.isdigit())
+        except:
+            wbs_tuple = ()
+            
+        if not wbs_tuple:
+            wbs_tuple = (999999, seq)
+        
+        start, finish = task.find(f'{ns}Start'), task.find(f'{ns}Finish')
+        b_start, b_finish = task.find(f'.//{ns}Baseline/{ns}Start'), task.find(f'.//{ns}Baseline/{ns}Finish')
+        pct = task.find(f'{ns}PercentComplete')
+        lvl = task.find(f'{ns}OutlineLevel')
+        milestone = task.find(f'{ns}Milestone')
+        
+        cost, ac_node = task.find(f'{ns}Cost'), task.find(f'{ns}ActualCost')
+        b_cost = task.find(f'.//{ns}Baseline/{ns}Cost')
+        
+        cost_val = float(cost.text) if cost is not None and cost.text else 0.0
+        b_cost_val = float(b_cost.text) if b_cost is not None and b_cost.text else cost_val
+        
+        tasks_raw.append({
+            'wbs_tuple': wbs_tuple,
+            'id': row_id,
+            'uid': uid.text, 'name': name.text,
+            'start': pd.to_datetime(start.text[:10]) if start is not None and start.text else None,
+            'end': pd.to_datetime(finish.text[:10]) if finish is not None and finish.text else None,
+            'b_start': pd.to_datetime(b_start.text[:10]) if b_start is not None and b_start.text else None,
+            'b_end': pd.to_datetime(b_finish.text[:10]) if b_finish is not None and b_finish.text else None,
+            'pct': float(pct.text) if pct is not None and pct.text else 0.0,
+            'level': int(lvl.text) if lvl is not None and lvl.text else 1,
+            'isMilestone': True if milestone is not None and milestone.text == '1' else False,
+            'bac': b_cost_val, 'ac': float(ac_node.text) if ac_node is not None and ac_node.text else 0.0,
+            'owner': ", ".join(assignments.get(uid.text, ["Equipe"]))
+        })
+        
+    df = pd.DataFrame(tasks_raw).dropna(subset=['start', 'end'])
+    if df.empty: return {}
+    
+    # ORDENA PELA WBS E DEPOIS PELO ID
+    df = df.sort_values(['wbs_tuple', 'id'])
+    
+    df['b_start'] = df['b_start'].fillna(df['start'])
+    df['b_end'] = df['b_end'].fillna(df['end'])
+    
+    df['parent'] = ""
+    last_uids = {}
+    for idx, row in df.iterrows():
+        lvl = row['level']
+        if lvl > 1 and (lvl - 1) in last_uids:
+            df.at[idx, 'parent'] = last_uids[lvl - 1]
+        last_uids[lvl] = row['uid']
+        
+    parent_counts = df['parent'].value_counts().to_dict()
+    df['children'] = df['uid'].map(lambda x: parent_counts.get(x, 0))
+
+    df['sv_days'] = (df['end'] - df['b_end']).dt.days
+    df['status'] = "No Prazo"
+    df.loc[df['pct'] == 100, 'status'] = "Concluída"
+    df.loc[(df['pct'] < 100) & ((df['sv_days'] > 0) | (df['end'] < status_date)), 'status'] = "Atrasada"
+
+    def calc_pv(x):
+        if x['b_end'] <= status_date: return x['bac']
+        if x['b_start'] <= status_date:
+            return x['bac'] * ((status_date - x['b_start']).days / max(1, (x['b_end'] - x['b_start']).days))
+        return 0.0
+
+    df['pv'] = df.apply(calc_pv, axis=1)
+    df['ev'] = df['bac'] * (df['pct'] / 100)
+    
+    lvl1 = df[df['level'] == 1] if not df[df['level'] == 1].empty else df
+    bac, pv, ev, ac = lvl1['bac'].sum(), lvl1['pv'].sum(), lvl1['ev'].sum(), lvl1['ac'].sum()
+    
+    has_finance = bac > 0
+    
+    spi = ev / pv if pv > 0 else 1.0
+    cpi = ev / ac if ac > 0 else 1.0
+    eac = bac / cpi if cpi > 0 else bac
+
+    min_date = df[['start', 'b_start']].min().min()
+    max_date = df[['end', 'b_end']].max().max()
+    tot_days = (max_date - min_date).days
+    if tot_days <= 0: tot_days = 1
+    today_pct = max(0, min(100, (status_date - min_date).days / tot_days * 100))
+
+    tasks_out = []
     for _, r in df.iterrows():
         b_l = max(0, (r['b_start'] - min_date).days / tot_days * 100)
         b_w = max(0.5, (r['b_end'] - r['b_start']).days / tot_days * 100)
@@ -17,7 +142,7 @@ tasks_out = []
             'svd': r['sv_days'], 'status': r['status'], 'level': r['level'],
             'b_left': f"{b_l:.2f}%", 'b_width': f"{b_w:.2f}%", 'a_left': f"{a_l:.2f}%", 'a_width': f"{a_w:.2f}%",
             'tag_cls': tag_cls, 'bar_cls': bar_cls,
-            # NOVOS CAMPOS FINANCEIROS PARA O DRILLDOWN DA TABELA EVA
+            # NOVOS CAMPOS FINANCEIROS PARA O DRILLDOWN
             'bac': r['bac'], 'pv': r['pv'], 'ev': r['ev'], 'ac': r['ac'],
             'sv': r['ev'] - r['pv'], 'cv': r['ev'] - r['ac'],
             'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0,
