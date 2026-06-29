@@ -10,7 +10,7 @@ def get_html_template(d):
         hidden = "hidden" if t['parent'] else ""
         late_val = "1" if t['status'] == 'Atrasada' else "0"
         
-        toggle = f"<span class='toggle' id='tg-{t['uid']}'>+</span>" if t['children'] > 0 else f"<span class='toggle dot' id='tg-{t['uid']}'></span>"
+        toggle = f"<span class='toggle' id='tg-{t['uid']}'>+</span>" if t['children'] > 0 else f"<span class='toggle dot'></span>"
         fw = "fw-bold" if t['children'] > 0 else ""
         sv_str = f"+{t['svd']}d" if t['svd'] > 0 else f"{t['svd']}d"
 
@@ -36,7 +36,7 @@ def get_html_template(d):
         delays_html += f"<tr onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td>{t['finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
     if not delays_html: delays_html = "<tr><td colspan='7' style='text-align:center;'>Nenhuma tarefa folha em atraso no momento.</td></tr>"
 
-    # 3. Lógica Financeira (Mostra EVA ou Mostra Aviso)
+    # 3. Lógica Financeira e Tabela EVA Hierárquica (Drilldown)
     if d['has_finance']:
         spi_str = f"{d['spi']:.2f}"
         cpi_str = f"{d['cpi']:.2f}"
@@ -44,9 +44,27 @@ def get_html_template(d):
         fin_warn_bar = "warnbar" if d['pct_fin'] > d['pct_phys'] else ""
         fin_bar_width = f"{d['pct_fin']}%"
         
-        phases_html = ""
-        for p in d['phases']:
-            phases_html += f"<tr><td>{p['name']}</td><td>{fmt(p['bac'])}</td><td>{fmt(p['pv'])}</td><td>{fmt(p['ev'])}</td><td>{fmt(p['ac'])}</td><td class='{'pos' if p['sv']>=0 else 'neg'}'>{fmt(p['sv'])}</td><td class='{'pos' if p['cv']>=0 else 'neg'}'>{fmt(p['cv'])}</td><td>{p['spi']:.2f}</td><td>{p['cpi']:.2f}</td></tr>"
+        eva_rows_html = ""
+        for t in d['tasks']:
+            pad = (t['level'] - 1) * 20
+            hidden = "hidden" if t['parent'] else ""
+            toggle = f"<span class='toggle' id='tg-eva-{t['uid']}'>+</span>" if t['children'] > 0 else f"<span class='toggle dot'></span>"
+            fw = "fw-bold" if t['children'] > 0 else ""
+            
+            eva_rows_html += f"""
+            <tr class='eva-row {hidden}' data-uid='{t['uid']}' data-parent='{t['parent']}'>
+                <td style='padding-left:{pad + 34}px; cursor:pointer;' onclick='togglePhase("{t['uid']}")'>
+                    <div style='position:relative;'>{toggle}<span class='{fw}'>{t['name']}</span></div>
+                </td>
+                <td>{fmt(t['bac'])}</td>
+                <td>{fmt(t['pv'])}</td>
+                <td>{fmt(t['ev'])}</td>
+                <td>{fmt(t['ac'])}</td>
+                <td class='{'pos' if t['sv']>=0 else 'neg'}'>{fmt(t['sv'])}</td>
+                <td class='{'pos' if t['cv']>=0 else 'neg'}'>{fmt(t['cv'])}</td>
+                <td class='{'pos' if t['spi']>=1 else 'neg'}'>{t['spi']:.2f}</td>
+                <td class='{'pos' if t['cpi']>=1 else 'neg'}'>{t['cpi']:.2f}</td>
+            </tr>"""
 
         eva_content = f"""
             <div class='eva-grid'>
@@ -97,11 +115,16 @@ def get_html_template(d):
                 </div>
             </div>
             
-            <h3 style="margin-top:32px; font-size:18px; color:#1e293b;">Extrato EVA por Fase</h3>
-            <div class='tw'><table><thead><tr><th>Fase (Sumário)</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{phases_html}</tbody></table></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:32px;">
+                <h3 style="font-size:18px; color:#1e293b; margin:0;">Extrato Financeiro (WBS)</h3>
+                <div>
+                    <button onclick='expandAll()'>Expandir Tudo</button>
+                    <button onclick='collapseAll()'>Recolher Tudo</button>
+                </div>
+            </div>
+            <div class='tw' style='margin-top:16px;'><table><thead><tr><th>Estrutura Analítica</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{eva_rows_html}</tbody></table></div>
         """
     else:
-        # Se não há dados financeiros (BAC = 0), preenche as variáveis de texto com "N/D" (Não Disponível)
         spi_str = "N/D"
         cpi_str = "N/D"
         pct_fin_str = "N/D"
@@ -116,7 +139,6 @@ def get_html_template(d):
             </div>
         """
 
-    # 4. Construção Final do HTML base (O replace agora lida apenas com as informações estruturais do cabeçalho)
     tasks_json = json.dumps(d['tasks'], ensure_ascii=False)
     
     html = f"""<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -163,9 +185,12 @@ def get_html_template(d):
         .task{{cursor:pointer; display:flex; align-items:flex-start; flex-direction:column; justify-content: center;}}
         .fw-bold {{font-weight: 600; color: #1e293b;}}
         .t-name {{font-size: 14px;}}
+        
+        /* Ajustes das Toggles para sincronia na tabela EVA */
         .toggle{{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:6px;margin-right:8px;background:#fff; font-size:14px; font-weight: bold; color: #475569; position:absolute; left: -28px; top: 0px;}}
         .toggle.dot{{border: none; background: #e2e8f0; width: 6px; height: 6px; border-radius: 50%; left: -16px; top: 7px;}}
         .task > div, .task > span {{position: relative;}}
+        
         .meta{{font-size:12px;color:#64748b;margin-top:6px}}
         .linebox{{position:relative;height:36px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;overflow:hidden}}
         .today{{position:absolute;top:0;bottom:0;width:2px;background:#cbd5e1;z-index:2}}
@@ -176,10 +201,14 @@ def get_html_template(d):
         .pct{{text-align:right;font-weight:700; font-size:13px; color:#334155}}
         .tag{{display:inline-flex;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700; margin-left: 6px; letter-spacing: 0.5px;}}
         .done{{background:#d1fae5;color:#047857}}.planned{{background:#e0f2fe;color:#0369a1}}.late-tag{{background:#ffe4e6;color:#be123c}}
+        
+        /* Tabela EVA Classes */
         table{{width:100%;border-collapse:collapse;font-size:13px}}
         th{{text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding:12px 10px; font-weight: 700;}}
-        td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155;}}
+        td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155; transition: background 0.1s;}}
         tr:hover td{{background: #f8fafc;}}
+        .eva-row:hover td {{background: #f8fafc;}}
+        
         .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
         .modal-backdrop.flex{{display:flex}}
         .modal{{background:white;max-width:800px;width:100%;border-radius:24px;padding:32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);}}
@@ -209,7 +238,7 @@ def get_html_template(d):
         
         <nav class='nav'>
             <a href='#prazo'>Resumo do Prazo</a>
-            <a href='#gantt'>Gantt Iterativo</a>
+            <a href='#gantt'>Gantt Interativo</a>
             <a href='#atrasos'>Painel de Atrasos</a>
             <a href='#eva'>Curva S & EVM</a>
         </nav>
@@ -234,7 +263,7 @@ def get_html_template(d):
             <div class='gantt-tools'>
                 <div>
                     <button onclick='expandAll()'>Expandir Tudo</button>
-                    <button onclick='collapseAll()'>Recolher Sumários</button>
+                    <button onclick='collapseAll()'>Recolher Tudo</button>
                     <button onclick='showOnlyLate()'>Filtrar Atrasadas</button>
                     <button onclick='showAllRows()'>Limpar Filtros</button>
                 </div>
@@ -267,6 +296,16 @@ def get_html_template(d):
     const byUid = Object.fromEntries(tasks.map(t => [String(t.uid), t]));
     const expanded = new Set();
     
+    // Função utilitária para garantir que tarefas nível 3 só apareçam se o nível 2 E o nível 1 estiverem expandidos
+    function isAncestorExpanded(uid) {{
+        let p = byUid[uid].parent;
+        while (p && p !== "") {{
+            if (!expanded.has(String(p))) return false;
+            p = byUid[p].parent;
+        }}
+        return true;
+    }}
+    
     function toggleOrDetail(uid){{
         const t = byUid[String(uid)];
         if(t.children > 0) togglePhase(uid); else showDetail(uid);
@@ -278,18 +317,26 @@ def get_html_template(d):
         renderVisibility();
     }}
     
+    // Agora renderiza simultaneamente o Gantt e a tabela EVA
     function renderVisibility(){{
-        document.querySelectorAll('.gantt-row').forEach(row => {{
-            const parentId = row.dataset.parent;
+        document.querySelectorAll('.gantt-row, .eva-row').forEach(row => {{
             const uid = row.dataset.uid;
-            const tg = document.getElementById('tg-'+uid);
+            const parentId = row.dataset.parent;
             
+            // Lógica rigorosa de visibilidade hierárquica
             if (!parentId || parentId === "") {{
                 row.classList.remove('hidden');
-                if (tg && byUid[uid].children > 0) tg.textContent = expanded.has(uid) ? '−' : '+';
             }} else {{
-                row.classList.toggle('hidden', !expanded.has(parentId));
-                if (tg && byUid[uid].children > 0) tg.textContent = expanded.has(uid) ? '−' : '+';
+                row.classList.toggle('hidden', !isAncestorExpanded(uid));
+            }}
+            
+            // Sincroniza ícones '+' ou '−' no Gantt E na tabela EVA
+            if (byUid[uid].children > 0) {{
+                const tgGantt = document.getElementById('tg-'+uid);
+                const tgEva = document.getElementById('tg-eva-'+uid);
+                const sign = expanded.has(uid) ? '−' : '+';
+                if (tgGantt) tgGantt.textContent = sign;
+                if (tgEva) tgEva.textContent = sign;
             }}
         }});
     }}

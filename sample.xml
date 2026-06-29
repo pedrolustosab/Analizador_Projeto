@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <Name>Projeto Dashboard Power BI Corporativo - Sample Completo</Name>
-  <Title>Cock do PMO</Title>
+  <Title>Projeto Dashboard Power BI Corporativo</Title>
   <StartDate>2026-06-01T08:00:00</StartDate>
   <FinishDate>2026-08-04T17:00:00</FinishDate>
   <StatusDate>2026-06-26T17:00:00</StatusDate>
@@ -23,42 +23,49 @@
       <ID>1</ID>
       <Name>PMO</Name>
       <Type>1</Type>
+      <Responsavel>Carlos Silva</Responsavel>
     </Resource>
     <Resource>
       <UID>2</UID>
       <ID>2</ID>
       <Name>Negócio</Name>
       <Type>1</Type>
+      <Responsavel>Mariana Costa</Responsavel>
     </Resource>
     <Resource>
       <UID>3</UID>
       <ID>3</ID>
       <Name>Engenharia de Dados</Name>
       <Type>1</Type>
+      <Responsavel>Pedro Oliveira</Responsavel>
     </Resource>
     <Resource>
       <UID>4</UID>
       <ID>4</ID>
       <Name>Arquitetura de Dados</Name>
       <Type>1</Type>
+      <Responsavel>Fernanda Souza</Responsavel>
     </Resource>
     <Resource>
       <UID>5</UID>
       <ID>5</ID>
       <Name>BI / Power BI</Name>
       <Type>1</Type>
+      <Responsavel>Roberto Santos</Responsavel>
     </Resource>
     <Resource>
       <UID>6</UID>
       <ID>6</ID>
       <Name>QA / Negócio</Name>
       <Type>1</Type>
+      <Responsavel>Juliana Mendes</Responsavel>
     </Resource>
     <Resource>
       <UID>7</UID>
       <ID>7</ID>
       <Name>Governança</Name>
       <Type>1</Type>
+      <Responsavel>Alexandre Lima</Responsavel>
     </Resource>
   </Resources>
   <Tasks>
