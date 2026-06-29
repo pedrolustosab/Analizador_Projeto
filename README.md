@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📊 Cockpit Executivo + EVA + Gantt + PERT
+# 📊 Cock do PMO
 
 **Dashboard executivo inteligente para gestão de projetos com análise avançada de cronograma e custos**
 
@@ -128,7 +128,7 @@ Após o upload, você terá acesso a:
 
 ## 🎓 Autor
 
-Desenvolvido por **Pedro Henrique Bezerra** como projeto de excelência para o Bootcamp de AI.
+Desenvolvido por **Pedro Lustosa** como projeto de excelência para o Bootcamp de AI.
 
 ---
 
