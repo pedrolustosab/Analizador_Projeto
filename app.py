@@ -10,7 +10,7 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
-st.set_page_config(page_title="Executive Command Center", layout="wide", page_icon="📊")
+st.set_page_config(page_title="PMO Intelligence", layout="wide", page_icon="📊")
 
 st.markdown("""
     <style>
@@ -23,8 +23,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### 🏢 PMO Intelligence")
-    st.caption("AI Analytics Engine para MS Project.")
+    st.markdown("### PMO Intelligence")
+    st.caption("O cockpit do seu MS Project.")
     st.divider()
     uploaded_file = st.file_uploader("📂 Upload do MS Project (.xml)", type=["xml"])
 
