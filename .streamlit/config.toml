@@ -1,30 +1,13 @@
 [theme]
-# Cor principal (botões, sliders, foco de input). Mesma cor 'Teal' do cabeçalho HTML.
-primaryColor = "#00a3b5"
-
-# Cor de fundo da área principal da página.
+primaryColor = "#0284c7"
 backgroundColor = "#f8fafc"
-
-# Cor de fundo da barra lateral (sidebar) e dos fundos de gráficos/painéis.
 secondaryBackgroundColor = "#ffffff"
-
-# Cor do texto principal.
-textColor = "#132238"
-
-# Fonte do aplicativo (sans serif é a mais elegante e limpa).
+textColor = "#0f172a"
 font = "sans serif"
 
-[server]
-# Aumenta o limite de upload de arquivos para 200MB (Garante que XMLs gigantes do MS Project não quebrem o app).
-maxUploadSize = 200
-
-# Remove o aviso de "Made with Streamlit" no menu direito superior e otimiza para produção.
-headless = true
-
-[browser]
-# Desativa o envio de estatísticas de uso para o Streamlit (Ideal para dados corporativos/sigilosos).
-gatherUsageStats = true
-
 [client]
-# Mostra sempre a barra de progresso do Spinner no topo da tela para uma UX melhor.
-showErrorDetails = true
+showSidebarNavigation = false
+toolbarMode = "minimal"
+
+[server]
+enableStaticServing = false

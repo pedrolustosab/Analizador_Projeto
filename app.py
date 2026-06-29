@@ -1,139 +1,91 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import base64
-import time
 
 try:
     from data_engine import parse_xml_to_json
     from html_generator import get_html_template
 except Exception as e:
-    st.error("### 🛑 Falha Crítica de Inicialização")
-    st.exception(e)
+    st.error("🛑 Falha Crítica de Inicialização")
     st.stop()
 
-# Configuração da Página
-st.set_page_config(page_title="PMO Intelligence Pro", layout="wide", page_icon="💎")
+st.set_page_config(page_title="PMO Intelligence Pro", layout="wide", page_icon="🚀", initial_sidebar_state="collapsed")
 
-# CSS para fixar a visibilidade e estilizar o Dropzone
+# CSS para exterminar qualquer resquício do Streamlit
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    header {display: none !important;}
+    footer {display: none !important;}
+    #MainMenu {display: none !important;}
+    .stDeployButton {display: none !important;}
+    [data-testid="collapsedControl"] {display: none !important;}
     
     .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+    .block-container { padding-top: 3rem !important; max-width: 1400px; }
     
-    /* Estilização do Campo de Upload para parecer um Dropzone Premium */
+    /* Upload Dropzone SaaS */
     [data-testid="stFileUploadDropzone"] {
-        border: 2px dashed #0284c7 !important;
-        background: #f0f9ff !important;
-        border-radius: 12px !important;
+        background-color: #ffffff !important;
+        border: 2px dashed #cbd5e1 !important;
+        border-radius: 16px !important;
         padding: 40px !important;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
     }
-
+    [data-testid="stFileUploadDropzone"]:hover {
+        border-color: #0284c7 !important;
+        background-color: #f0f9ff !important;
+    }
     .stDownloadButton > button {
-        width: 100%;
-        background: linear-gradient(135deg, #0284c7, #2563eb) !important;
+        background: linear-gradient(135deg, #0f172a, #1e293b) !important;
         color: white !important;
         border: none !important;
         padding: 12px 24px !important;
-        font-weight: 600 !important;
         border-radius: 8px !important;
+        font-weight: 600 !important;
+        width: 100%;
+        transition: transform 0.2s !important;
     }
-
-    .feature-card {
-        background: white;
-        padding: 24px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        text-align: center;
-        margin-top: 20px;
-    }
+    .stDownloadButton > button:hover { transform: translateY(-2px); }
     </style>
 """, unsafe_allow_html=True)
 
-# Variável para controlar o upload
-uploaded_file = None
+uploaded_file = st.file_uploader("", type=["xml"], label_visibility="collapsed")
 
-# --- SIDEBAR (Sempre visível para controle) ---
-with st.sidebar:
-    st.markdown("""
-        <div style='text-align: center;'>
-            <h1 style='color: #0f172a; margin: 0; font-size: 24px;'>💎 PMO Intel</h1>
-            <p style='color: #64748b; font-size: 12px;'>Enterprise Analytics</p>
-        </div>
-    """, unsafe_allow_html=True)
-    st.divider()
-    
-    # Upload secundário na lateral
-    st.markdown("### 📥 Novo Projeto")
-    sidebar_upload = st.file_uploader("Trocar arquivo XML", type=["xml"], key="sidebar_up")
-    if sidebar_upload:
-        uploaded_file = sidebar_upload
-
-    st.divider()
-    st.info("O processamento é realizado 100% no seu navegador, garantindo a privacidade dos dados do cronograma.")
-
-# --- ÁREA PRINCIPAL ---
 if not uploaded_file:
-    # Se não houver arquivo, mostra a Landing Page com o upload no MEIO
+    # LANDING PAGE INICIAL
     st.markdown("""
-        <div style="text-align: center; margin-top: 5vh;">
-            <span style="background: #e0f2fe; color: #0284c7; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; text-transform: uppercase;">
-                Engine de Inteligência de Projetos
-            </span>
-            <h1 style="color: #0f172a; font-size: 3rem; letter-spacing: -1.5px; margin-top: 20px;">
-                Seu cronograma, nível <span style="color: #0284c7;">Executivo</span>.
+        <div style="text-align: center; margin-top: 4vh; margin-bottom: 40px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; background: #ecfdf5; color: #059669; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; margin-bottom: 24px; border: 1px solid #a7f3d0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                PROCESSAMENTO 100% NO NAVEGADOR
+            </div>
+            <h1 style="color: #0f172a; font-size: 3.5rem; letter-spacing: -1.5px; margin-bottom: 16px;">
+                PMO Intel <span style="color: #0284c7;">Engine</span>
             </h1>
-            <p style="color: #64748b; font-size: 1.1rem; max-width: 600px; margin: 0 auto 40px auto;">
-                Arraste seu arquivo XML do MS Project para a área abaixo para processar métricas de EVM e Caminho Crítico.
+            <p style="color: #64748b; font-size: 1.1rem; max-width: 600px; margin: 0 auto;">
+                Arraste seu arquivo XML do MS Project acima. A análise de EVM, Gantt e Caminho de Marcos é gerada localmente. Nenhum dado é enviado para servidores externos.
             </p>
         </div>
     """, unsafe_allow_html=True)
-
-    # Upload Central
-    main_upload = st.file_uploader("", type=["xml"], key="main_up")
-    if main_upload:
-        uploaded_file = main_upload
-        st.rerun() # Força a atualização para renderizar o dashboard
-
-    # Cards informativos abaixo do upload
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('<div class="feature-card"><h3>🎯 EVM</h3><p>Cálculo de SPI, CPI e Curva S integrados.</p></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="feature-card"><h3>🕸️ PERT</h3><p>Caminho crítico visual (CPM) dinâmico.</p></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="feature-card"><h3>📊 Gantt</h3><p>Drill-down hierárquico profissional.</p></div>', unsafe_allow_html=True)
-
 else:
-    # --- DASHBOARD ATIVO ---
-    st.toast('Arquivo carregado com sucesso!', icon='🚀')
-    
-    try:
-        app_data = parse_xml_to_json(uploaded_file.getvalue())
-        html_string = get_html_template(app_data)
-        
-        col_text, col_btn = st.columns([5, 1.5])
-        with col_text:
-            st.markdown(f"### 📑 Dashboard Ativo: **{app_data['proj_name']}**")
-            st.caption(f"Data Base do Relatório: {app_data['status_date']}")
+    # RENDERIZAÇÃO DO DASHBOARD
+    with st.spinner("Construindo painel executivo..."):
+        try:
+            app_data = parse_xml_to_json(uploaded_file.getvalue())
+            html_string = get_html_template(app_data)
             
-        with col_btn:
-            st.download_button(
-                label="📥 Exportar Cockpit (HTML)", 
-                data=html_string, 
-                file_name=f"Cockpit_{app_data['proj_name']}.html", 
-                mime="text/html"
-            )
-        
-        st.divider()
-        
-        # Renderização do Dashboard
-        b64_html = base64.b64encode(html_string.encode('utf-8')).decode('utf-8')
-        iframe_src = f"data:text/html;base64,{b64_html}"
-        components.iframe(iframe_src, height=1400, scrolling=True)
-        
-    except Exception as e:
-        st.error("### 🛑 Erro no processamento")
-        st.markdown("O XML fornecido não possui o formato esperado pelo MS Project.")
-        st.exception(e)
+            c1, c2 = st.columns([5, 1.5])
+            with c1:
+                st.markdown(f"### 📊 Dashboard: **{app_data['proj_name']}**")
+            with c2:
+                st.download_button("📥 Baixar Relatório HTML", html_string, file_name="PMO_Cockpit.html", mime="text/html")
+            
+            # Injeção Iframe Base64
+            b64_html = base64.b64encode(html_string.encode('utf-8')).decode('utf-8')
+            iframe_src = f"data:text/html;base64,{b64_html}"
+            components.iframe(iframe_src, height=1400, scrolling=True)
+            
+        except Exception as e:
+            st.error("Erro na leitura do arquivo.")
+            st.exception(e)

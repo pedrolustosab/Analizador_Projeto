@@ -1,7 +1,6 @@
 import pandas as pd
 import xml.etree.ElementTree as ET
 import io
-import re
 
 def parse_xml_to_json(file_bytes):
     tree = ET.parse(io.BytesIO(file_bytes))
@@ -31,19 +30,14 @@ def parse_xml_to_json(file_bytes):
         if uid is None or name is None or not name.text: continue
         
         id_node = task.find(f'{ns}ID')
-        try:
-            row_id = int(id_node.text)
-        except:
-            row_id = seq
+        try: row_id = int(id_node.text)
+        except: row_id = seq
 
         out_node = task.find(f'{ns}OutlineNumber')
         out_str = out_node.text if out_node is not None and out_node.text else ""
-        try:
-            wbs_tuple = tuple(int(x) for x in out_str.split('.') if x.isdigit())
-        except:
-            wbs_tuple = ()
-        if not wbs_tuple:
-            wbs_tuple = (999999, seq)
+        try: wbs_tuple = tuple(int(x) for x in out_str.split('.') if x.isdigit())
+        except: wbs_tuple = ()
+        if not wbs_tuple: wbs_tuple = (999999, seq)
         
         start, finish = task.find(f'{ns}Start'), task.find(f'{ns}Finish')
         b_start, b_finish = task.find(f'.//{ns}Baseline/{ns}Start'), task.find(f'.//{ns}Baseline/{ns}Finish')
@@ -54,24 +48,11 @@ def parse_xml_to_json(file_bytes):
         cost, ac_node = task.find(f'{ns}Cost'), task.find(f'{ns}ActualCost')
         b_cost = task.find(f'.//{ns}Baseline/{ns}Cost')
         
-        # --- NOVO: Mineração para o PERT/CPM ---
-        crit_node = task.find(f'{ns}Critical')
-        is_critical = True if crit_node is not None and crit_node.text == '1' else False
-        
-        preds = []
-        for p_link in task.findall(f'{ns}PredecessorLink'):
-            p_uid = p_link.find(f'{ns}PredecessorUID')
-            if p_uid is not None:
-                preds.append(p_uid.text)
-        # ---------------------------------------
-        
         cost_val = float(cost.text) if cost is not None and cost.text else 0.0
         b_cost_val = float(b_cost.text) if b_cost is not None and b_cost.text else cost_val
         
         tasks_raw.append({
-            'wbs_tuple': wbs_tuple,
-            'id': row_id,
-            'uid': uid.text, 'name': name.text,
+            'wbs_tuple': wbs_tuple, 'id': row_id, 'uid': uid.text, 'name': name.text,
             'start': pd.to_datetime(start.text[:10]) if start is not None and start.text else None,
             'end': pd.to_datetime(finish.text[:10]) if finish is not None and finish.text else None,
             'b_start': pd.to_datetime(b_start.text[:10]) if b_start is not None and b_start.text else None,
@@ -79,7 +60,6 @@ def parse_xml_to_json(file_bytes):
             'pct': float(pct.text) if pct is not None and pct.text else 0.0,
             'level': int(lvl.text) if lvl is not None and lvl.text else 1,
             'isMilestone': True if milestone is not None and milestone.text == '1' else False,
-            'is_critical': is_critical, 'preds': preds,
             'bac': b_cost_val, 'ac': float(ac_node.text) if ac_node is not None and ac_node.text else 0.0,
             'owner': ", ".join(assignments.get(uid.text, ["Equipe"]))
         })
@@ -95,8 +75,7 @@ def parse_xml_to_json(file_bytes):
     last_uids = {}
     for idx, row in df.iterrows():
         lvl = row['level']
-        if lvl > 1 and (lvl - 1) in last_uids:
-            df.at[idx, 'parent'] = last_uids[lvl - 1]
+        if lvl > 1 and (lvl - 1) in last_uids: df.at[idx, 'parent'] = last_uids[lvl - 1]
         last_uids[lvl] = row['uid']
         
     parent_counts = df['parent'].value_counts().to_dict()
@@ -125,8 +104,7 @@ def parse_xml_to_json(file_bytes):
 
     min_date = df[['start', 'b_start']].min().min()
     max_date = df[['end', 'b_end']].max().max()
-    tot_days = (max_date - min_date).days
-    if tot_days <= 0: tot_days = 1
+    tot_days = (max_date - min_date).days if (max_date - min_date).days > 0 else 1
     today_pct = max(0, min(100, (status_date - min_date).days / tot_days * 100))
 
     tasks_out = []
@@ -148,47 +126,39 @@ def parse_xml_to_json(file_bytes):
             'svd': r['sv_days'], 'status': r['status'], 'level': r['level'],
             'b_left': f"{b_l:.2f}%", 'b_width': f"{b_w:.2f}%", 'a_left': f"{a_l:.2f}%", 'a_width': f"{a_w:.2f}%",
             'tag_cls': tag_cls, 'bar_cls': bar_cls,
-            'bac': r['bac'], 'pv': r['pv'], 'ev': r['ev'], 'ac': r['ac'],
-            'sv': r['ev'] - r['pv'], 'cv': r['ev'] - r['ac'],
-            'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0,
-            'cpi': r['ev'] / r['ac'] if r['ac'] > 0 else 1.0
+            'bac': r['bac'], 'pv': r['pv'], 'ev': r['ev'], 'ac': r['ac'], 'sv': r['ev'] - r['pv'], 'cv': r['ev'] - r['ac'],
+            'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0, 'cpi': r['ev'] / r['ac'] if r['ac'] > 0 else 1.0
         })
 
-    # --- NOVO: GERADOR DE GRÁFICO PERT (MERMAID SYNTAX) ---
-    leaf_df = df[df['children'] == 0] # Filtra apenas tarefas operacionais (folhas)
-    leaf_uids = set(leaf_df['uid'].tolist())
+    # --- NOVO: LÓGICA DA LINHA DO TEMPO (TRACKER DE DELIVERY) ---
+    milestones_timeline = []
+    has_active = False
+    m_df = df[df['isMilestone'] == True].sort_values('end')
     
-    mermaid_lines = ["graph LR"] # Renderiza da Esquerda pra Direita (Left-to-Right)
-    for _, r in leaf_df.iterrows():
-        uid = r['uid']
-        # Limpeza do texto para não quebrar a sintaxe do Mermaid
-        safe_name = re.sub(r'[^a-zA-Z0-9À-ÿ\s]', '', r['name'])
-        if len(safe_name) > 30: safe_name = safe_name[:27] + "..."
+    for _, r in m_df.iterrows():
+        clean_name = r['name'].replace("Marco: ", "").replace("Marco ", "")
         
-        dur = max(0, (r['end'] - r['start']).days)
-        
-        # Formata o nó: Círculos p/ Marcos, Retângulos p/ Tarefas
-        if r['isMilestone']:
-            shape = f"T{uid}(( {safe_name}<br><b>MARCO</b> ))"
+        if r['pct'] == 100:
+            m_state = 'completed'
+        elif r['end'] <= status_date and r['pct'] < 100:
+            if not has_active:
+                m_state = 'active-late'
+                has_active = True
+            else:
+                m_state = 'late'
         else:
-            shape = f"T{uid}[ {safe_name}<br>{dur} dias ]"
-            
-        style = ":::crit" if r['is_critical'] else ":::norm"
-        mermaid_lines.append(f"    {shape}{style}")
-        
-    for _, r in leaf_df.iterrows():
-        for p in r['preds']:
-            if p in leaf_uids:
-                # Desenha as setas de dependência
-                mermaid_lines.append(f"    T{p} --> T{r['uid']}")
+            if not has_active:
+                m_state = 'active'
+                has_active = True
+            else:
+                m_state = 'pending'
                 
-    mermaid_lines.append("    classDef crit fill:#fee2e2,stroke:#ef4444,stroke-width:3px,color:#991b1b,font-family:Inter;")
-    mermaid_lines.append("    classDef norm fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,color:#334155,font-family:Inter;")
-    mermaid_str = "\n".join(mermaid_lines)
-    # -------------------------------------------------------
+        milestones_timeline.append({
+            'name': clean_name, 'date': r['end'].strftime('%d %b'), 'state': m_state
+        })
+    # -------------------------------------------------------------
 
-    max_money = max(bac, eac) * 1.1
-    if max_money <= 0: max_money = 1
+    max_money = max(bac, eac) * 1.1 if max(bac, eac) > 0 else 1
     def g_x(d): return 80 + ((d - min_date).days / tot_days) * 1100
     def g_y(v): return 340 - (v / max_money) * 320
 
@@ -204,10 +174,6 @@ def parse_xml_to_json(file_bytes):
             ev_pts.append(f"{g_x(r['end']):.1f},{g_y(c_ev):.1f}")
             ac_pts.append(f"{g_x(r['end']):.1f},{g_y(c_ac):.1f}")
 
-    today_x, end_x = g_x(status_date), g_x(max_date)
-    fc_ev_pts = f"{today_x:.1f},{g_y(c_ev):.1f} {end_x:.1f},{g_y(bac):.1f}"
-    fc_ac_pts = f"{today_x:.1f},{g_y(c_ac):.1f} {end_x:.1f},{g_y(eac):.1f}"
-
     return {
         "proj_name": proj_name, "status_date": status_date.strftime('%d/%m/%y'),
         "tot_tasks": len(df), "b_end": df['b_end'].max().strftime('%d/%m/%y'), "f_end": df['end'].max().strftime('%d/%m/%y'),
@@ -215,11 +181,12 @@ def parse_xml_to_json(file_bytes):
         "pct_phys": (df['pct'].mean()) if len(df)>0 else 0, "pct_fin": (ac/bac*100) if bac>0 else 0, "pct_done": (len(df[df['status'] == 'Concluída'])/len(df)*100) if len(df)>0 else 0,
         "spi": spi, "cpi": cpi, "bac": bac, "pv": pv, "ev": ev, "ac": ac, "eac": eac, "vac": bac - eac, "sv": ev - pv, "cv": ev - ac,
         "has_finance": has_finance,
-        "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out, "mermaid_str": mermaid_str,
+        "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out, "milestones": milestones_timeline,
         "chart": {
             "pv_pts": " ".join(pv_pts), "ev_pts": " ".join(ev_pts), "ac_pts": " ".join(ac_pts), 
-            "fc_ev": fc_ev_pts, "fc_ac": fc_ac_pts, 
-            "tx": today_x, "m": max_money,
+            "fc_ev": f"{g_x(status_date):.1f},{g_y(c_ev):.1f} {g_x(max_date):.1f},{g_y(bac):.1f}", 
+            "fc_ac": f"{g_x(status_date):.1f},{g_y(c_ac):.1f} {g_x(max_date):.1f},{g_y(eac):.1f}", 
+            "tx": g_x(status_date), "m": max_money,
             "max_y_labels": [0, max_money*0.25, max_money*0.5, max_money*0.75, max_money]
         }
     }
