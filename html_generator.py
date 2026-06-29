@@ -198,7 +198,7 @@ def get_html_template(d):
         
         <header class='hero'>
             <div><div class='eyebrow'>Executive Dashboard</div><h1>{d['proj_name']}</h1>
-            <p>Acompanhamento automatizado de cronograma e matriz de custos (EVA/EVM).</p></div>
+            <p>Acompanhamento do seu projeto de forma fácil.</p></div>
             <div class='hero-panel'><div class='hero-grid'>
                 <div class='hero-mini'><span>Data Base</span><b>{d['status_date']}</b></div>
                 <div class='hero-mini'><span>Tarefas Mapeadas</span><b>{d['tot_tasks']}</b></div>
