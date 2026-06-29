@@ -140,7 +140,7 @@ def get_html_template(d):
         :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7; --blue-light:#0ea5e9;}}
         *{{box-sizing:border-box}}
         body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}}
-        .shell{{max-width:1440px;margin:0 auto;padding:24px}}
+        .shell{max-width:100%;margin:0 auto;padding:0 32px;}
         
         /* HEADER E NAV (Restaurados) */
         .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}

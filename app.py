@@ -21,7 +21,12 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none !important;}
     
     .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 3rem !important; max-width: 1400px; }
+    .block-container { 
+        padding-top: 2rem !important; 
+        max-width: 100% !important; 
+        padding-left: 2rem !important; 
+        padding-right: 2rem !important; 
+    }
     
     /* Upload Dropzone SaaS */
     [data-testid="stFileUploadDropzone"] {
