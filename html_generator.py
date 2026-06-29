@@ -3,7 +3,7 @@ import json
 def get_html_template(d):
     fmt = lambda x: f"R$ {x/1000:,.1f}k".replace(',', 'X').replace('.', ',').replace('X', '.')
     
-    # 1. Montagem das Linhas do Gantt (Completo e de Alta Qualidade)
+    # 1. Montagem das Linhas do Gantt
     gantt_html = ""
     for t in d['tasks']:
         pad = (t['level'] - 1) * 18
@@ -134,15 +134,18 @@ def get_html_template(d):
 
     tasks_json = json.dumps(d['tasks'], ensure_ascii=False)
     
+    # AQUI ESTÁ A CHAVE DE CORREÇÃO {{max-width:100%}}
     html = f"""<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
     <title>Premium XML Dashboard</title>
     <style>
         :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7; --blue-light:#0ea5e9;}}
         *{{box-sizing:border-box}}
         body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}}
-        .shell{max-width:100%;margin:0 auto;padding:0 32px;}
         
-        /* HEADER E NAV (Restaurados) */
+        /* LINHA CORRIGIDA PARA 100% COM CHAVES DUPLAS */
+        .shell{{max-width:100%;margin:0 auto;padding:0 32px;}}
+        
+        /* HEADER E NAV */
         .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}
         .hero h1{{margin:8px 0 8px;font-size:32px; letter-spacing: -0.5px;}}
         .eyebrow{{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#cbd5e1;font-weight:700}}
@@ -172,7 +175,7 @@ def get_html_template(d):
         .bar-fill.warnbar{{background:var(--amber)}}
         .neg{{color:var(--red)!important;font-weight:700}}.pos{{color:var(--green)!important;font-weight:700}}.warn{{color:var(--amber)!important;font-weight:700}}
         
-        /* GANTT E TABELAS (Restaurados) */
+        /* GANTT E TABELAS */
         .gantt-tools{{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap; margin-bottom: 20px;}}
         .gantt-tools input{{border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:320px; font-size: 13px; outline: none;}}
         .gantt-tools input:focus{{border-color: var(--blue);}}
@@ -200,7 +203,7 @@ def get_html_template(d):
         td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155;}}
         tr:hover td{{background: #f8fafc;}}
         
-        /* MODAL (Restaurado) */
+        /* MODAL */
         .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
         .modal-backdrop.flex{{display:flex}}
         .modal{{background:white;max-width:800px;width:100%;border-radius:24px;padding:32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);}}
@@ -214,7 +217,7 @@ def get_html_template(d):
         .svg-container {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }}
         .svg-legend {{ display: flex; gap: 20px; margin-bottom: 24px; justify-content: center; font-size: 13px; font-weight: 600; color: #475569; }}
         
-        /* TRACKER DE MARCOS (Injetado perfeitamente no layout premium) */
+        /* TRACKER DE MARCOS */
         .tracker-container {{ overflow-x: auto; padding: 20px 0; }}
         .tracker {{ display: flex; list-style: none; justify-content: space-between; position: relative; min-width: 800px; padding: 0 20px; margin: 0; }}
         .step {{ width: 100%; position: relative; text-align: center; z-index: 2; }}
@@ -272,7 +275,6 @@ def get_html_template(d):
             </div>
         </section>
 
-        <!-- NOVO: TRACKER INSERIDO AQUI DENTRO DO LAYOUT PREMIUM -->
         <section class='section' id='timeline'><h2>Linha do Tempo (Marcos do Projeto)</h2>
             <div class="tracker-container">
                 <ul class="tracker">
@@ -306,7 +308,7 @@ def get_html_template(d):
         </section>
     </div>
     
-    <!-- MODAL RESTAURADO -->
+    <!-- MODAL -->
     <div class='modal-backdrop' id='modalBackdrop' onclick='closeModal(event)'><div class='modal' onclick='event.stopPropagation()'>
         <button class='close' onclick='hideModal()'>Fechar</button>
         <h2 id='modalTitle' style='font-size:24px; color:#0f172a; margin-bottom: 4px;'>Detalhe</h2><p id='modalSub' style='color:#64748b; margin-top:0;'></p>
