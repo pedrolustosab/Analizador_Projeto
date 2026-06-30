@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playbook Executivo - PMO Intel</title>
+    <style>
+        /* BASE & PALETA DE CORES IDÊNTICA AO APP */
+        :root {
+            --bg: #f8fafc;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --primary: #0284c7;
+            --primary-light: #e0f2fe;
+            --line: #e2e8f0;
+            --card-bg: #ffffff;
+            --red: #e11d48;
+            --green: #10b981;
+            --orange: #ea580c;
+            --purple: #8b5cf6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--ink); line-height: 1.6; padding-bottom: 80px; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+        /* HERO SECTION (Topo) */
+        .hero {
+            background: linear-gradient(135deg, #0f172a, #1e293b 56%, #334155);
+            border-radius: 24px;
+            padding: 48px;
+            color: #fff;
+            margin-top: 32px;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+            text-align: center;
+        }
+        .hero .eyebrow { font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #cbd5e1; font-weight: 700; margin-bottom: 12px; display: block; }
+        .hero h1 { font-size: 40px; letter-spacing: -1px; margin-bottom: 16px; }
+        .hero p { color: #94a3b8; font-size: 18px; max-width: 700px; margin: 0 auto; }
+
+        /* SEÇÕES E CARDS */
+        .section { margin-top: 48px; }
+        .section-header { margin-bottom: 24px; border-bottom: 2px solid var(--line); padding-bottom: 12px; }
+        .section-header h2 { font-size: 24px; letter-spacing: -0.5px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        
+        .card { background: var(--card-bg); border: 1px solid var(--line); border-radius: 16px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+        .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .card p { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+
+        /* BADGES E TAGS */
+        .tag-red { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .tag-orange { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .tag-purple { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+
+        /* STEPS (Passo a Passo) */
+        .step-list { list-style: none; counter-reset: my-awesome-counter; }
+        .step-list li { position: relative; padding-left: 48px; margin-bottom: 24px; }
+        .step-list li::before {
+            counter-increment: my-awesome-counter;
+            content: counter(my-awesome-counter);
+            position: absolute; left: 0; top: 0;
+            width: 32px; height: 32px;
+            background: var(--primary-light); color: var(--primary);
+            border-radius: 50%; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .step-list b { color: var(--ink); font-size: 16px; display: block; margin-bottom: 4px; }
+
+        /* CALLOUT ALERT */
+        .alert { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-top: 24px; display: flex; gap: 12px;}
+        .alert p { margin: 0; font-size: 14px; color: #92400e; }
+        
+        /* RESPONSIVIDADE */
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="hero">
+        <span class="eyebrow">Playbook de Adoção</span>
+        <h1>Dominando o PMO Intel Engine</h1>
+        <p>Um guia tático para preparar seus dados, interpretar métricas avançadas e conduzir reuniões executivas de alto impacto utilizando o Dashboard.</p>
+    </header>
+
+    <!-- FASE 1: O INPUT -->
+    <section class="section">
+        <div class="section-header">
+            <h2>⚙️ Fase 1: A Regra de Ouro (Preparando o MS Project)</h2>
+        </div>
+        <div class="card">
+            <p>O motor de inteligência do aplicativo cruza o <b>Planejado vs. Realizado</b>. Para que a matemática do EVM (Curva S) e os alertas de atraso funcionem, o seu arquivo do Microsoft Project precisa estar devidamente "selado".</p>
+            
+            <ul class="step-list">
+                <li>
+                    <b>Atribua Custos ou Recursos</b>
+                    O cálculo do Valor Agregado (EV) depende de dinheiro. Certifique-se de que as tarefas possuem custos fixos ou recursos com taxas/hora cadastradas na Planilha de Recursos.
+                </li>
+                <li>
+                    <b>Ação Crítica: Salvar Linha de Base (Baseline)</b>
+                    Antes de atualizar o progresso do projeto (%), vá na aba <i>Projeto > Definir Linha de Base > Salvar Linha de Base</i>. Sem isso, o sistema não saberá qual era o plano original para calcular os desvios.
+                </li>
+                <li>
+                    <b>Atualize o Progresso e a Data de Status</b>
+                    Defina a data de status do projeto (Data de corte da análise) e atualize as colunas <i>% Concluído</i> e <i>Término Real</i>.
+                </li>
+                <li>
+                    <b>Exporte para XML</b>
+                    Vá em <i>Arquivo > Salvar Como</i> e escolha o formato <b>Dados XML (*.xml)</b>. É este arquivo que você arrastará para o nosso Dashboard.
+                </li>
+            </ul>
+
+            <div class="alert">
+                <span style="font-size: 24px;">💡</span>
+                <p><b>Dica de Ouro:</b> Se o Dashboard abrir e mostrar o aviso "Análise Indisponível" na seção financeira, significa que o seu XML não possui a tag de Custo (Custos = R$ 0). Volte ao Project, adicione um custo de R$ 1.000 em uma tarefa sumária só para teste, e repita a exportação.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FASE 2: NAVEGAÇÃO -->
+    <section class="section">
+        <div class="section-header">
+            <h2>🧭 Fase 2: Lendo o Dashboard como um C-Level</h2>
+        </div>
+        
+        <div class="grid-2">
+            <div class="card">
+                <h3>1. Tracker de Marcos (Timeline)</h3>
+                <p>No topo do dashboard, os diretores não querem ler tarefas, querem ver entregas. O Tracker filtra automaticamente todas as tarefas com <i>Duração = 0</i> (Marcos). </p>
+                <p><b>Como interpretar:</b><br>
+                Bolas Verdes = Entregue.<br>
+                Bolas Azuis (Pulsando) = Trabalhando agora (No Prazo).<br>
+                Bolas Vermelhas (Pulsando) = Trabalhando agora (Atrasado).</p>
+            </div>
+            
+            <div class="card">
+                <h3>2. O Filtro em Cascata (Matriz)</h3>
+                <p>A tabela central consolida apenas as <b>Anomalias</b>. Utilize o primeiro menu suspenso (Gravidade) para focar.</p>
+                <p><b>Fluxo Tático:</b> Se você tem 15 minutos em uma reunião de diretoria, selecione <b>"Somente 🔴 Incêndio"</b>. O segundo filtro se adaptará automaticamente, permitindo que você isole apenas "Marcos Rompidos" ou "Efeito Dominó".</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FASE 3: A MATRIZ DE CAUSAS EXPLICADA -->
+    <section class="section">
+        <div class="section-header">
+            <h2>🚨 Fase 3: Entendendo a Matriz de Causa Raiz</h2>
+        </div>
+        <p style="color: var(--muted); margin-bottom: 24px;">O motor de dados lê as entrelinhas do XML e gera 8 Tags diagnósticas (Diagnostic Analytics) exclusivas do nosso algoritmo.</p>
+
+        <div class="grid-3">
+            <div class="card" style="border-top: 4px solid var(--red);">
+                <h3>Fila de Incêndio</h3>
+                <p>Problemas que já estouraram a linha de base e impactam diretamente a entrega.</p>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <span class="tag-red">T2: Estouro Real</span>
+                    <span class="tag-red">T7: Marco Rompido</span>
+                    <span class="tag-red">T8: Efeito Dominó (Gargalo de Predecessora)</span>
+                </div>
+            </div>
+
+            <div class="card" style="border-top: 4px solid var(--orange);">
+                <h3>Fila de Atenção</h3>
+                <p>Riscos iminentes. A linha final de base ainda não passou, mas o projeto está doente.</p>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <span class="tag-orange">T1: Inércia (Início passou e tem 0%)</span>
+                    <span class="tag-orange">T3: Desvio Projetado</span>
+                    <span class="tag-orange">T6: Alerta de Ritmo (% menor que os dias passados)</span>
+                </div>
+            </div>
+
+            <div class="card" style="border-top: 4px solid var(--purple);">
+                <h3>Auditoria / Post-Mortem</h3>
+                <p>Anomalias de comportamento da equipe ou maquiagem de cronograma.</p>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <span class="tag-purple">T4: Maquiado (0%, mas empurrado pra frente)</span>
+                    <span class="tag-purple">T5: Absorvido (Entregue atrasado, já resolvido)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FASE 4: DRILLDOWN E EXPORTAÇÃO -->
+    <section class="section">
+        <div class="section-header">
+            <h2>🔍 Fase 4: O Modal de Drilldown e Exportação</h2>
+        </div>
+        <div class="card">
+            <p>Sempre que um gestor questionar um número no <b>Gantt WBS</b> ou na <b>Tabela de Atrasos</b>, basta <b>Clicar em cima da linha da tarefa</b>.</p>
+            <p>O aplicativo não recarregará a página. Um <i>Modal Popup</i> (Tela sobreposta) abrirá instantaneamente mostrando:</p>
+            <ul style="margin-left: 20px; color: var(--muted); margin-top: 10px; margin-bottom: 20px; line-height: 1.8;">
+                <li>Datas exatas (Baseline vs. Real).</li>
+                <li>Os dias de variação matemática.</li>
+                <li><b>Drill-down:</b> A lista de todas as subtarefas contidas naquela fase com seus percentuais de avanço.</li>
+            </ul>
+            
+            <hr style="border: 0; border-top: 1px solid var(--line); margin: 24px 0;">
+            
+            <h3 style="color: var(--ink); font-size: 16px; margin-bottom: 8px;">A Mágica da Exportação Offline 🪄</h3>
+            <p>No topo direito do Dashboard, clique no botão escuro <b>"📥 Baixar Relatório HTML"</b>. O sistema empacotará todo o JavaScript, o CSS, a renderização SVG da Curva S e o Banco de Dados (JSON) em <b>um único arquivo HTML leve</b>.</p>
+            <p>Você pode enviar esse arquivo via e-mail ou WhatsApp para o Presidente da empresa. Ele abrirá no celular ou no computador instantaneamente, de forma interativa, <b>sem precisar de internet, sem precisar instalar Python e sem precisar de licença do MS Project</b>.</p>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>
