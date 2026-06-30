@@ -148,7 +148,7 @@ def get_html_template(d):
         .kpis, .progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
         .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
         
-        /* AQUI A MÁGICA DOS 10 CARDS (5 Colunas) */
+        /* EVA GRID COM 5 COLUNAS */
         .eva-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}}
         
         .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
@@ -192,7 +192,7 @@ def get_html_template(d):
         .cause-orange {{ background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }}
         .cause-purple {{ background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }}
         
-        /* MATRIZ COM TOTALIZADOR (4 Colunas) */
+        /* MATRIZ COM TOTALIZADOR */
         .grav-matrix {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }}
         .grav-card {{ padding: 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); }}
         .grav-card.g-total {{ background: #f8fafc; border-color: #cbd5e1; }}
@@ -241,12 +241,12 @@ def get_html_template(d):
         @keyframes pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(14, 165, 233, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }} }}
         @keyframes pulseLate {{ 0% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }} }}
 
-        /* GLOSSÁRIO */
-        .glossary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
-        .glossary-box { background: #fff; padding: 24px; border: 1px solid var(--line); border-radius: 16px; }
-        .glossary-box h3 { color: #0ea5e9; font-size: 16px; margin: 0 0 16px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;}
-        .glossary-item { margin-bottom: 12px; font-size: 13px; line-height: 1.5; color: #475569;}
-        .glossary-item b { color: #0f172a; }
+        /* GLOSSÁRIO (CSS com {{ duplicadas para o Python) */
+        .glossary-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }}
+        .glossary-box {{ background: #fff; padding: 24px; border: 1px solid var(--line); border-radius: 16px; }}
+        .glossary-box h3 {{ color: #0ea5e9; font-size: 16px; margin: 0 0 16px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }}
+        .glossary-item {{ margin-bottom: 12px; font-size: 13px; line-height: 1.5; color: #475569; }}
+        .glossary-item b {{ color: #0f172a; }}
     </style>
     </head>
     <body><div class='shell'>
@@ -318,7 +318,6 @@ def get_html_template(d):
                 </div>
             </div>
 
-            <!-- FILTROS DA TABELA DE ATRASOS -->
             <div class='gantt-tools' style='margin-bottom: 12px; justify-content: flex-start;'>
                 <select id="delayGravFilter" onchange="filterDelayTable()">
                     <option value="all">Todas as Gravidades</option>
@@ -328,7 +327,7 @@ def get_html_template(d):
                 </select>
                 <select id="delayTagFilter" onchange="filterDelayTable()">
                     <option value="all">Todos os Motivos</option>
-                    <option value="T1">T1: Inércia</option>
+                    <option value="T1">T1: Inércia (Não Iniciou)</option>
                     <option value="T2">T2: Estouro Real</option>
                     <option value="T3">T3: Desvio Projetado</option>
                     <option value="T4">T4: Maquiado</option>
@@ -366,7 +365,6 @@ def get_html_template(d):
             {eva_content}
         </section>
 
-        <!-- NOVO: GLOSSÁRIO CORPORATIVO -->
         <section class='section' id='glossario'>
             <h2>Dicionário de Negócios (Glossário PMO)</h2>
             <div class="glossary-grid">
@@ -383,7 +381,7 @@ def get_html_template(d):
                     <div class="glossary-item"><b>EAC (Estimate at Completion):</b> Previsão atualizada de quanto o projeto custará no total (BAC / CPI).</div>
                     <div class="glossary-item"><b>VAC (Variance at Completion):</b> Desvio projetado final do orçamento (BAC - EAC).</div>
                 </div>
-                <div class="glossary-item glossary-box">
+                <div class="glossary-box">
                     <h3>🚨 Matriz de Causas (Tags de Anomalia)</h3>
                     <div class="glossary-item"><b>T1: Inércia (Não Iniciou)</b> 🟠 A data de início já passou e a tarefa está com 0% de avanço.</div>
                     <div class="glossary-item"><b>T2: Estouro Real</b> 🔴 A tarefa está em andamento, mas a data de fim planejada (baseline) já estourou.</div>
@@ -451,7 +449,6 @@ def get_html_template(d):
     function expandAll(){{ tasks.filter(t=>t.children > 0).forEach(t=>expanded.add(String(t.uid))); renderVisibility(); }}
     function collapseAll(){{ expanded.clear(); renderVisibility(); }}
     
-    // Filtro do Gantt
     function filterGantt(){{
         const q = document.getElementById('search').value.toLowerCase().trim();
         const grav = document.getElementById('gravFilter').value;
@@ -472,7 +469,6 @@ def get_html_template(d):
         }});
     }}
 
-    // NOVO: Filtro da Tabela de Atrasos
     function filterDelayTable() {{
         const grav = document.getElementById('delayGravFilter').value;
         const tag = document.getElementById('delayTagFilter').value;
