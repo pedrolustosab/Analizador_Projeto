@@ -45,6 +45,14 @@ def parse_xml_to_json(file_bytes):
         lvl = task.find(f'{ns}OutlineLevel')
         milestone = task.find(f'{ns}Milestone')
         
+        crit_node = task.find(f'{ns}Critical')
+        is_critical = True if crit_node is not None and crit_node.text == '1' else False
+        
+        preds = []
+        for p_link in task.findall(f'{ns}PredecessorLink'):
+            p_uid = p_link.find(f'{ns}PredecessorUID')
+            if p_uid is not None: preds.append(p_uid.text)
+        
         cost, ac_node = task.find(f'{ns}Cost'), task.find(f'{ns}ActualCost')
         b_cost = task.find(f'.//{ns}Baseline/{ns}Cost')
         
@@ -60,6 +68,7 @@ def parse_xml_to_json(file_bytes):
             'pct': float(pct.text) if pct is not None and pct.text else 0.0,
             'level': int(lvl.text) if lvl is not None and lvl.text else 1,
             'isMilestone': True if milestone is not None and milestone.text == '1' else False,
+            'is_critical': is_critical, 'preds': preds,
             'bac': b_cost_val, 'ac': float(ac_node.text) if ac_node is not None and ac_node.text else 0.0,
             'owner': ", ".join(assignments.get(uid.text, ["Equipe"]))
         })
@@ -107,6 +116,46 @@ def parse_xml_to_json(file_bytes):
     tot_days = (max_date - min_date).days if (max_date - min_date).days > 0 else 1
     today_pct = max(0, min(100, (status_date - min_date).days / tot_days * 100))
 
+    # --- NOVO: ENGINE DE MATRIZ DE GRAVIDADE (8 TAGS) ---
+    task_pct_map = df.set_index('uid')['pct'].to_dict()
+    matrix_counts = {"critico": 0, "atencao": 0, "auditoria": 0}
+
+    def get_delay_analytics(r):
+        if r['children'] > 0: return "", "", "" # Não aplica tag em fases sumárias
+        
+        if r['pct'] == 100:
+            if r['end'] > r['b_end'] and r['is_critical']:
+                return "T5: Absorvido", "auditoria", "purple"
+            return "", "", ""
+            
+        if r['isMilestone'] and (r['end'] > r['b_end'] or status_date > r['b_end']):
+            return "T7: Marco Rompido", "critico", "red"
+            
+        has_blocked_pred = any(task_pct_map.get(p, 100) < 100 for p in r['preds'])
+        if has_blocked_pred and (r['end'] > r['b_end'] or r['start'] > r['b_start']):
+            return "T8: Efeito Dominó", "critico", "red"
+            
+        if 0 < r['pct'] < 100 and status_date > r['b_end']:
+            return "T2: Estouro Real", "critico", "red"
+            
+        if r['pct'] == 0 and status_date > r['b_start']:
+            return "T1: Inércia (Não Iniciou)", "atencao", "orange"
+            
+        if 0 < r['pct'] < 100 and r['start'] < status_date:
+            dur = (r['end'] - r['start']).days
+            if dur > 0:
+                exp_pct = ((status_date - r['start']).days / dur) * 100
+                if exp_pct > r['pct'] + 15: # Threshold de 15% de descompasso rítmico
+                    return "T6: Alerta de Ritmo", "atencao", "orange"
+                    
+        if 0 < r['pct'] < 100 and r['end'] > r['b_end']:
+            return "T3: Desvio Projetado", "atencao", "orange"
+            
+        if r['pct'] == 0 and r['start'] > r['b_start']:
+            return "T4: Cronograma Maquiado", "auditoria", "purple"
+            
+        return "", "", ""
+
     tasks_out = []
     for _, r in df.iterrows():
         b_l = max(0, (r['b_start'] - min_date).days / tot_days * 100)
@@ -119,6 +168,10 @@ def parse_xml_to_json(file_bytes):
         if r['children'] > 0 and r['pct'] < 100: bar_cls = 'phase'
         if r['isMilestone']: bar_cls += ' milestone'
 
+        # Aplica a Função Analítica
+        delay_tag, delay_grav, delay_color = get_delay_analytics(r)
+        if delay_grav: matrix_counts[delay_grav] += 1
+
         tasks_out.append({
             'uid': r['uid'], 'parent': r['parent'], 'children': r['children'], 'name': r['name'], 'owner': r['owner'],
             'pct': int(r['pct']), 'start': r['start'].strftime('%d/%m/%Y'), 'finish': r['end'].strftime('%d/%m/%Y'),
@@ -126,37 +179,25 @@ def parse_xml_to_json(file_bytes):
             'svd': r['sv_days'], 'status': r['status'], 'level': r['level'],
             'b_left': f"{b_l:.2f}%", 'b_width': f"{b_w:.2f}%", 'a_left': f"{a_l:.2f}%", 'a_width': f"{a_w:.2f}%",
             'tag_cls': tag_cls, 'bar_cls': bar_cls,
+            'delay_tag': delay_tag, 'delay_grav': delay_grav, 'delay_color': delay_color,
             'bac': r['bac'], 'pv': r['pv'], 'ev': r['ev'], 'ac': r['ac'], 'sv': r['ev'] - r['pv'], 'cv': r['ev'] - r['ac'],
             'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0, 'cpi': r['ev'] / r['ac'] if r['ac'] > 0 else 1.0
         })
 
-    # --- NOVO: LÓGICA DA LINHA DO TEMPO (TRACKER DE DELIVERY) ---
+    # Timeline (Marcos)
     milestones_timeline = []
     has_active = False
     m_df = df[df['isMilestone'] == True].sort_values('end')
-    
     for _, r in m_df.iterrows():
         clean_name = r['name'].replace("Marco: ", "").replace("Marco ", "")
-        
-        if r['pct'] == 100:
-            m_state = 'completed'
+        if r['pct'] == 100: m_state = 'completed'
         elif r['end'] <= status_date and r['pct'] < 100:
-            if not has_active:
-                m_state = 'active-late'
-                has_active = True
-            else:
-                m_state = 'late'
+            m_state = 'active-late' if not has_active else 'late'
+            has_active = True
         else:
-            if not has_active:
-                m_state = 'active'
-                has_active = True
-            else:
-                m_state = 'pending'
-                
-        milestones_timeline.append({
-            'name': clean_name, 'date': r['end'].strftime('%d %b'), 'state': m_state
-        })
-    # -------------------------------------------------------------
+            m_state = 'active' if not has_active else 'pending'
+            has_active = True
+        milestones_timeline.append({'name': clean_name, 'date': r['end'].strftime('%d %b'), 'state': m_state})
 
     max_money = max(bac, eac) * 1.1 if max(bac, eac) > 0 else 1
     def g_x(d): return 80 + ((d - min_date).days / tot_days) * 1100
@@ -182,6 +223,7 @@ def parse_xml_to_json(file_bytes):
         "spi": spi, "cpi": cpi, "bac": bac, "pv": pv, "ev": ev, "ac": ac, "eac": eac, "vac": bac - eac, "sv": ev - pv, "cv": ev - ac,
         "has_finance": has_finance,
         "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out, "milestones": milestones_timeline,
+        "matrix": matrix_counts, # ENVIANDO A MATRIZ PARA O HTML
         "chart": {
             "pv_pts": " ".join(pv_pts), "ev_pts": " ".join(ev_pts), "ac_pts": " ".join(ac_pts), 
             "fc_ev": f"{g_x(status_date):.1f},{g_y(c_ev):.1f} {g_x(max_date):.1f},{g_y(bac):.1f}", 

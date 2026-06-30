@@ -3,7 +3,7 @@ import json
 def get_html_template(d):
     fmt = lambda x: f"R$ {x/1000:,.1f}k".replace(',', 'X').replace('.', ',').replace('X', '.')
     
-    # 1. Montagem das Linhas do Gantt
+    # 1. Montagem das Linhas do Gantt (com as Tags de Causa Raiz)
     gantt_html = ""
     for t in d['tasks']:
         pad = (t['level'] - 1) * 18
@@ -14,11 +14,14 @@ def get_html_template(d):
         fw = "fw-bold" if t['children'] > 0 else ""
         sv_str = f"+{t['svd']}d" if t['svd'] > 0 else f"{t['svd']}d"
 
+        # Badge da Causa Raiz (Aparece ao lado do Status)
+        cause_badge = f"<span class='tag cause-{t['delay_color']}'>{t['delay_tag']}</span>" if t['delay_tag'] else ""
+
         gantt_html += f"""
-        <div class='gantt-row {hidden}' data-uid='{t['uid']}' data-parent='{t['parent']}' data-late='{late_val}'>
+        <div class='gantt-row {hidden}' data-uid='{t['uid']}' data-parent='{t['parent']}' data-late='{late_val}' data-grav='{t['delay_grav']}'>
             <div class='task' style='padding-left:{pad}px' onclick='toggleOrDetail("{t['uid']}")'>
                 {toggle}<span class='t-name {fw}'>{t['name']}</span>
-                <div class='meta'>{t['owner']} · BL {t['b_finish'][:5]} · Atual {t['finish'][:5]} · SV {sv_str} <span class='tag {t['tag_cls']}'>{t['status']}</span></div>
+                <div class='meta'>{t['owner']} · BL {t['b_finish'][:5]} · Atual {t['finish'][:5]} · SV {sv_str} <span class='tag {t['tag_cls']}'>{t['status']}</span> {cause_badge}</div>
             </div>
             <div class='linebox' onclick='showDetail("{t['uid']}")'>
                 <span class='today' style='left:{d['today_pct']}'></span>
@@ -28,32 +31,24 @@ def get_html_template(d):
             <div class='pct'>{t['pct']}%</div>
         </div>"""
 
-    # 2. Montagem Tabela de Atrasos
+    # 2. Montagem Tabela de Atrasos com Nova Coluna Analítica
     delays_html = ""
-    lates = [t for t in d['tasks'] if t['status'] == 'Atrasada' and t['children'] == 0]
-    lates.sort(key=lambda x: x['svd'], reverse=True)
+    lates = [t for t in d['tasks'] if t['delay_tag'] != "" and t['children'] == 0]
+    lates.sort(key=lambda x: (x['delay_color'] == 'red', x['svd']), reverse=True) # Prioriza os vermelhos
     for t in lates:
-        delays_html += f"<tr onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td>{t['finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
-    if not delays_html: delays_html = "<tr><td colspan='7' style='text-align:center;'>Nenhuma tarefa folha em atraso no momento.</td></tr>"
+        badge = f"<span class='tag cause-{t['delay_color']}'>{t['delay_tag']}</span>"
+        delays_html += f"<tr onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{badge}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
+    if not delays_html: delays_html = "<tr><td colspan='7' style='text-align:center;'>Nenhuma anomalia detectada no momento.</td></tr>"
 
-    # 3. Lógica do Tracker de Marcos (Linha do Tempo Delivery)
+    # 3. Lógica do Tracker de Marcos
     tracker_html = ""
     for m in d['milestones']:
-        tracker_html += f"""
-        <li class="step {m['state']}">
-            <div class="node"></div>
-            <p>{m['name']}</p>
-            <small>{m['date']}</small>
-        </li>
-        """
-    if not tracker_html:
-        tracker_html = "<li class='step pending'><p>Nenhum marco cadastrado</p></li>"
+        tracker_html += f"<li class='step {m['state']}'><div class='node'></div><p>{m['name']}</p><small>{m['date']}</small></li>"
+    if not tracker_html: tracker_html = "<li class='step pending'><p>Nenhum marco cadastrado</p></li>"
 
-    # 4. Lógica Financeira (Cards + Curva S SVG + Tabela Drilldown)
+    # 4. Lógica Financeira 
     if d['has_finance']:
-        spi_str = f"{d['spi']:.2f}"
-        cpi_str = f"{d['cpi']:.2f}"
-        pct_fin_str = f"{d['pct_fin']:.1f}%"
+        spi_str, cpi_str, pct_fin_str = f"{d['spi']:.2f}", f"{d['cpi']:.2f}", f"{d['pct_fin']:.1f}%"
         fin_warn_bar = "warnbar" if d['pct_fin'] > d['pct_phys'] else ""
         fin_bar_width = f"{d['pct_fin']}%"
         
@@ -63,12 +58,9 @@ def get_html_template(d):
             hidden = "hidden" if t['parent'] else ""
             toggle = f"<span class='toggle' id='tg-eva-{t['uid']}'>+</span>" if t['children'] > 0 else f"<span class='toggle dot'></span>"
             fw = "fw-bold" if t['children'] > 0 else ""
-            
             eva_rows_html += f"""
             <tr class='eva-row {hidden}' data-uid='{t['uid']}' data-parent='{t['parent']}'>
-                <td style='padding-left:{pad + 34}px; cursor:pointer;' onclick='togglePhase("{t['uid']}")'>
-                    <div style='position:relative;'>{toggle}<span class='{fw}'>{t['name']}</span></div>
-                </td>
+                <td style='padding-left:{pad + 34}px; cursor:pointer;' onclick='togglePhase("{t['uid']}")'><div style='position:relative;'>{toggle}<span class='{fw}'>{t['name']}</span></div></td>
                 <td>{fmt(t['bac'])}</td><td>{fmt(t['pv'])}</td><td>{fmt(t['ev'])}</td><td>{fmt(t['ac'])}</td>
                 <td class='{'pos' if t['sv']>=0 else 'neg'}'>{fmt(t['sv'])}</td><td class='{'pos' if t['cv']>=0 else 'neg'}'>{fmt(t['cv'])}</td>
                 <td class='{'pos' if t['spi']>=1 else 'neg'}'>{t['spi']:.2f}</td><td class='{'pos' if t['cpi']>=1 else 'neg'}'>{t['cpi']:.2f}</td>
@@ -76,24 +68,23 @@ def get_html_template(d):
 
         eva_content = f"""
             <div class='eva-grid'>
-                <div class='eva-card'><span>Budget (BAC)</span><b>{fmt(d['bac'])}</b><small>Total Aprovado</small></div>
-                <div class='eva-card'><span>Planejado (PV)</span><b>{fmt(d['pv'])}</b><small>Esforço Agendado</small></div>
-                <div class='eva-card'><span>Agregado (EV)</span><b>{fmt(d['ev'])}</b><small>Entrega Realizada</small></div>
-                <div class='eva-card'><span>Custo Real (AC)</span><b>{fmt(d['ac'])}</b><small>Gasto Incorrido</small></div>
-                <div class='eva-card'><span>Var. Prazo (SV)</span><b class='{'pos' if d['sv']>=0 else 'neg'}'>{fmt(d['sv'])}</b><small>EV - PV</small></div>
-                <div class='eva-card'><span>Var. Custo (CV)</span><b class='{'pos' if d['cv']>=0 else 'neg'}'>{fmt(d['cv'])}</b><small>EV - AC</small></div>
-                <div class='eva-card'><span>SPI</span><b class='{'pos' if d['spi']>=1 else 'neg'}'>{d['spi']:.2f}</b><small>> 1.0 é positivo</small></div>
-                <div class='eva-card'><span>CPI</span><b class='{'pos' if d['cpi']>=1 else 'neg'}'>{d['cpi']:.2f}</b><small>> 1.0 é positivo</small></div>
-                <div class='eva-card'><span>EAC</span><b>{fmt(d['eac'])}</b><small>Custo projetado</small></div>
-                <div class='eva-card'><span>VAC</span><b class='{'pos' if d['vac']>=0 else 'neg'}'>{fmt(d['vac'])}</b><small>BAC - EAC</small></div>
+                <div class='eva-card'><span>Budget (BAC)</span><b>{fmt(d['bac'])}</b></div>
+                <div class='eva-card'><span>Planejado (PV)</span><b>{fmt(d['pv'])}</b></div>
+                <div class='eva-card'><span>Agregado (EV)</span><b>{fmt(d['ev'])}</b></div>
+                <div class='eva-card'><span>Custo Real (AC)</span><b>{fmt(d['ac'])}</b></div>
+                <div class='eva-card'><span>Var. Prazo (SV)</span><b class='{'pos' if d['sv']>=0 else 'neg'}'>{fmt(d['sv'])}</b></div>
+                <div class='eva-card'><span>Var. Custo (CV)</span><b class='{'pos' if d['cv']>=0 else 'neg'}'>{fmt(d['cv'])}</b></div>
+                <div class='eva-card'><span>SPI</span><b class='{'pos' if d['spi']>=1 else 'neg'}'>{d['spi']:.2f}</b></div>
+                <div class='eva-card'><span>CPI</span><b class='{'pos' if d['cpi']>=1 else 'neg'}'>{d['cpi']:.2f}</b></div>
+                <div class='eva-card'><span>EAC</span><b>{fmt(d['eac'])}</b></div>
+                <div class='eva-card'><span>VAC</span><b class='{'pos' if d['vac']>=0 else 'neg'}'>{fmt(d['vac'])}</b></div>
             </div>
             
             <div class='svg-container'>
                 <div class="svg-legend">
-                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#94a3b8"/></svg> Valor Planejado (PV)</span>
-                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#0ea5e9"/></svg> Valor Agregado (EV)</span>
-                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#f43f5e"/></svg> Custo Real (AC)</span>
-                    <span style="margin-left: 10px;"><svg width="24" height="4"><line x1="0" y1="2" x2="24" y2="2" stroke="#64748b" stroke-width="2" stroke-dasharray="4"/></svg> Forecast</span>
+                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#94a3b8"/></svg> PV (Planejado)</span>
+                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#0ea5e9"/></svg> EV (Agregado)</span>
+                    <span><svg width="14" height="14"><rect width="14" height="14" fill="#f43f5e"/></svg> AC (Custo Real)</span>
                 </div>
                 <div style="overflow-x: auto;">
                     <svg viewBox="0 0 1200 380" style="width: 100%; min-width: 900px; font-family: Inter, sans-serif;">
@@ -102,29 +93,18 @@ def get_html_template(d):
                         <line x1="80" y1="260" x2="1180" y2="260" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="264" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][1])}</text>
                         <line x1="80" y1="180" x2="1180" y2="180" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="184" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][2])}</text>
                         <line x1="80" y1="100" x2="1180" y2="100" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="104" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][3])}</text>
-                        <line x1="80" y1="20" x2="1180" y2="20" stroke="#f1f5f9" stroke-width="2"/><text x="70" y="24" text-anchor="end" fill="#94a3b8" font-size="12" font-weight="600">{fmt(d['chart']['max_y_labels'][4])}</text>
-                        
                         <line x1="{d['chart']['tx']:.1f}" y1="10" x2="{d['chart']['tx']:.1f}" y2="340" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6"/>
-                        <rect x="{d['chart']['tx'] - 30:.1f}" y="350" width="60" height="24" rx="4" fill="#f1f5f9"/>
-                        <text x="{d['chart']['tx']:.1f}" y="366" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700">HOJE</text>
-                        
                         <polyline points="{d['chart']['pv_pts']}" fill="none" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['ev_pts']}" fill="none" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['ac_pts']}" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                         <polyline points="{d['chart']['fc_ev']}" fill="none" stroke="#0ea5e9" stroke-width="3" stroke-dasharray="6" stroke-linecap="round"/>
                         <polyline points="{d['chart']['fc_ac']}" fill="none" stroke="#f43f5e" stroke-width="3" stroke-dasharray="6" stroke-linecap="round"/>
-                        
                         <circle cx="1180" cy="{340 - (d['bac'] / d['chart']['m']) * 320:.1f}" r="5" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
                         <text x="1170" y="{340 - (d['bac'] / d['chart']['m']) * 320 - 12:.1f}" text-anchor="end" fill="#0ea5e9" font-size="12" font-weight="700">BAC {fmt(d['bac'])}</text>
                         <circle cx="1180" cy="{340 - (d['eac'] / d['chart']['m']) * 320:.1f}" r="5" fill="#f43f5e" stroke="#fff" stroke-width="2"/>
                         <text x="1170" y="{340 - (d['eac'] / d['chart']['m']) * 320 - 12:.1f}" text-anchor="end" fill="#f43f5e" font-size="12" font-weight="700">EAC {fmt(d['eac'])}</text>
                     </svg>
                 </div>
-            </div>
-            
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:32px;">
-                <h3 style="font-size:18px; color:#1e293b; margin:0;">Extrato Financeiro (WBS)</h3>
-                <div><button onclick='expandAll()'>Expandir Tudo</button> <button onclick='collapseAll()'>Recolher Tudo</button></div>
             </div>
             <div class='tw' style='margin-top:16px;'><table><thead><tr><th>Estrutura Analítica</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{eva_rows_html}</tbody></table></div>
         """
@@ -134,18 +114,14 @@ def get_html_template(d):
 
     tasks_json = json.dumps(d['tasks'], ensure_ascii=False)
     
-    # AQUI ESTÁ A CHAVE DE CORREÇÃO {{max-width:100%}}
     html = f"""<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
     <title>Premium XML Dashboard</title>
     <style>
         :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7; --blue-light:#0ea5e9;}}
         *{{box-sizing:border-box}}
         body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}}
-        
-        /* LINHA CORRIGIDA PARA 100% COM CHAVES DUPLAS */
         .shell{{max-width:100%;margin:0 auto;padding:0 32px;}}
         
-        /* HEADER E NAV */
         .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}
         .hero h1{{margin:8px 0 8px;font-size:32px; letter-spacing: -0.5px;}}
         .eyebrow{{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#cbd5e1;font-weight:700}}
@@ -161,7 +137,6 @@ def get_html_template(d):
         .section{{background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;margin-top:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.05)}}
         h2{{margin:0 0 20px 0;font-size:20px; letter-spacing: -0.5px; color: #1e293b;}}
         
-        /* KPIS E PROGRESSO */
         .kpis,.eva-grid,.progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
         .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
         .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
@@ -173,12 +148,13 @@ def get_html_template(d):
         .bar-bg{{height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-top:14px}}
         .bar-fill{{height:100%;border-radius:999px;background:var(--blue)}}
         .bar-fill.warnbar{{background:var(--amber)}}
-        .neg{{color:var(--red)!important;font-weight:700}}.pos{{color:var(--green)!important;font-weight:700}}.warn{{color:var(--amber)!important;font-weight:700}}
+        .neg{{color:var(--red)!important;font-weight:700}}.pos{{color:var(--green)!important;font-weight:700}}
         
-        /* GANTT E TABELAS */
         .gantt-tools{{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap; margin-bottom: 20px;}}
-        .gantt-tools input{{border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:320px; font-size: 13px; outline: none;}}
-        .gantt-tools input:focus{{border-color: var(--blue);}}
+        .gantt-tools select, .gantt-tools input{{border:1px solid var(--line);border-radius:8px;padding:10px 16px; font-size: 13px; outline: none; background: #fff;}}
+        .gantt-tools input{{min-width:320px;}}
+        .gantt-tools select:focus, .gantt-tools input:focus{{border-color: var(--blue);}}
+        
         .gantt,.tw{{overflow-x:auto}}
         .gantt-row{{display:grid;grid-template-columns:520px 1fr 68px;gap:16px;align-items:center;min-width:1000px;border-bottom:1px solid #f1f5f9;padding:12px 0;}}
         .gantt-row:hover{{background: #f8fafc;}}
@@ -196,14 +172,31 @@ def get_html_template(d):
         .cur{{background:var(--blue-light)}}.donebar{{background:#10b981}}.late{{background:#f43f5e}}.phase{{background:#6366f1}}
         .bar.milestone{{height:12px!important;width:12px!important;top:12px!important;transform:rotate(45deg);border-radius:3px;background:#334155!important}}
         .pct{{text-align:right;font-weight:700; font-size:13px; color:#334155}}
+        
         .tag{{display:inline-flex;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700; margin-left: 6px; letter-spacing: 0.5px;}}
         .done{{background:#d1fae5;color:#047857}}.planned{{background:#e0f2fe;color:#0369a1}}.late-tag{{background:#ffe4e6;color:#be123c}}
+        
+        /* TAGS DE CAUSA RAIZ (Matriz de Gravidade) */
+        .cause-red {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }}
+        .cause-orange {{ background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }}
+        .cause-purple {{ background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }}
+        
+        /* CARDS DA MATRIZ DE GRAVIDADE */
+        .grav-matrix {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }}
+        .grav-card {{ padding: 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); }}
+        .grav-card.g-red {{ background: #fef2f2; border-color: #fca5a5; }}
+        .grav-card.g-orange {{ background: #fff7ed; border-color: #fdba74; }}
+        .grav-card.g-purple {{ background: #faf5ff; border-color: #d8b4fe; }}
+        .grav-info h4 {{ margin: 0 0 4px 0; font-size: 15px; color: #0f172a; }}
+        .grav-info p {{ margin: 0; font-size: 12px; color: #475569; }}
+        .grav-num {{ font-size: 32px; font-weight: 700; }}
+        .g-red .grav-num {{ color: #b91c1c; }} .g-orange .grav-num {{ color: #c2410c; }} .g-purple .grav-num {{ color: #7e22ce; }}
+
         table{{width:100%;border-collapse:collapse;font-size:13px}}
         th{{text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding:12px 10px; font-weight: 700;}}
         td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155;}}
         tr:hover td{{background: #f8fafc;}}
         
-        /* MODAL */
         .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
         .modal-backdrop.flex{{display:flex}}
         .modal{{background:white;max-width:800px;width:100%;border-radius:24px;padding:32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);}}
@@ -211,13 +204,11 @@ def get_html_template(d):
         .detail-box{{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
         .detail-label{{font-size:11px;text-transform:uppercase;font-weight:700;color:#64748b;}}
         .detail-value{{font-weight:700;margin-top:8px; font-size: 16px; color: #0f172a;}}
-        .close{{float:right; background: #f1f5f9; color: #334155; border: none;}}
+        .close{{float:right; background: #f1f5f9; color: #334155; border: none; cursor:pointer; padding: 6px 12px; border-radius: 6px;}}
         
-        /* SVG CHART */
         .svg-container {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }}
         .svg-legend {{ display: flex; gap: 20px; margin-bottom: 24px; justify-content: center; font-size: 13px; font-weight: 600; color: #475569; }}
         
-        /* TRACKER DE MARCOS */
         .tracker-container {{ overflow-x: auto; padding: 20px 0; }}
         .tracker {{ display: flex; list-style: none; justify-content: space-between; position: relative; min-width: 800px; padding: 0 20px; margin: 0; }}
         .step {{ width: 100%; position: relative; text-align: center; z-index: 2; }}
@@ -252,11 +243,11 @@ def get_html_template(d):
         </header>
         
         <nav class='nav'>
-            <a href='#prazo'>Resumo do Projeto</a>
+            <a href='#prazo'>Resumo</a>
             <a href='#timeline'>Linha do Tempo</a>
+            <a href='#atrasos'>Causa Raiz & Atrasos</a>
             <a href='#gantt'>Gantt Interativo</a>
-            <a href='#atrasos'>Painel de Atrasos</a>
-            <a href='#eva'>Curva S & EVM</a>
+            <a href='#eva'>Curva S (EVM)</a>
         </nav>
         
         <section class='section' id='prazo'><h2>Diagnóstico de Cronograma</h2>
@@ -282,14 +273,43 @@ def get_html_template(d):
                 </ul>
             </div>
         </section>
+
+        <!-- NOVO: MATRIZ DE GRAVIDADE C-LEVEL -->
+        <section class='section' id='atrasos'>
+            <h2>Matriz de Gravidade (Análise de Causas)</h2>
+            <p style="color:#64748b; font-size:14px; margin-top:-12px; margin-bottom:20px;">Classificação inteligente de desvios no cronograma (Apenas tarefas folha).</p>
+            
+            <div class="grav-matrix">
+                <div class="grav-card g-red">
+                    <div class="grav-info"><h4>🔴 Fila de Incêndio</h4><p>Marcos Rompidos, Estouro Real e Efeito Dominó.</p></div>
+                    <div class="grav-num">{d['matrix'].get('critico', 0)}</div>
+                </div>
+                <div class="grav-card g-orange">
+                    <div class="grav-info"><h4>🟠 Fila de Atenção</h4><p>Inércia, Alerta de Ritmo e Desvio Projetado.</p></div>
+                    <div class="grav-num">{d['matrix'].get('atencao', 0)}</div>
+                </div>
+                <div class="grav-card g-purple">
+                    <div class="grav-info"><h4>🟣 Auditoria Técnica</h4><p>Cronograma Maquiado ou Absorvido no Crítico.</p></div>
+                    <div class="grav-num">{d['matrix'].get('auditoria', 0)}</div>
+                </div>
+            </div>
+
+            <div class='tw'><table><thead><tr><th>UID</th><th>Tarefa</th><th>Responsável</th><th>Motivo Analítico</th><th>Progresso</th><th>Baseline Fim</th><th>Variação</th></tr></thead>
+            <tbody>{delays_html}</tbody></table></div>
+        </section>
         
         <section class='section' id='gantt'><h2>Gantt Interativo (WBS)</h2>
             <div class='gantt-tools'>
-                <div>
+                <div style="display:flex; gap:12px;">
                     <button onclick='expandAll()'>Expandir Tudo</button>
                     <button onclick='collapseAll()'>Recolher Tudo</button>
-                    <button onclick='showOnlyLate()'>Filtrar Atrasadas</button>
-                    <button onclick='showAllRows()'>Limpar Filtros</button>
+                    <!-- NOVO FILTRO DE CAUSA RAIZ -->
+                    <select id="gravFilter" onchange="filterRows()">
+                        <option value="all">Todas as Tarefas</option>
+                        <option value="critico">Somente 🔴 Incêndio</option>
+                        <option value="atencao">Somente 🟠 Atenção</option>
+                        <option value="auditoria">Somente 🟣 Auditoria</option>
+                    </select>
                 </div>
                 <input id='search' placeholder='Pesquisar tarefa, responsável, status...' oninput='filterRows()'>
             </div>
@@ -298,17 +318,11 @@ def get_html_template(d):
             </div>
         </section>
         
-        <section class='section' id='atrasos'><h2>Detalhamento de Atrasos (Tarefas Folha)</h2>
-            <div class='tw'><table><thead><tr><th>UID</th><th>Tarefa</th><th>Owner</th><th>Progresso</th><th>Baseline Fim</th><th>Data Atual Projetada</th><th>Variação</th></tr></thead>
-            <tbody>{delays_html}</tbody></table></div>
-        </section>
-        
         <section class='section' id='eva'><h2>Análise de Valor Agregado (EVM)</h2>
             {eva_content}
         </section>
     </div>
     
-    <!-- MODAL -->
     <div class='modal-backdrop' id='modalBackdrop' onclick='closeModal(event)'><div class='modal' onclick='event.stopPropagation()'>
         <button class='close' onclick='hideModal()'>Fechar</button>
         <h2 id='modalTitle' style='font-size:24px; color:#0f172a; margin-bottom: 4px;'>Detalhe</h2><p id='modalSub' style='color:#64748b; margin-top:0;'></p>
@@ -346,11 +360,8 @@ def get_html_template(d):
             const uid = row.dataset.uid;
             const parentId = row.dataset.parent;
             
-            if (!parentId || parentId === "") {{
-                row.classList.remove('hidden');
-            }} else {{
-                row.classList.toggle('hidden', !isAncestorExpanded(uid));
-            }}
+            if (!parentId || parentId === "") {{ row.classList.remove('hidden'); }} 
+            else {{ row.classList.toggle('hidden', !isAncestorExpanded(uid)); }}
             
             if (byUid[uid].children > 0) {{
                 const tgGantt = document.getElementById('tg-'+uid);
@@ -364,16 +375,27 @@ def get_html_template(d):
     
     function expandAll(){{ tasks.filter(t=>t.children > 0).forEach(t=>expanded.add(String(t.uid))); renderVisibility(); }}
     function collapseAll(){{ expanded.clear(); renderVisibility(); }}
-    function showOnlyLate(){{ expandAll(); document.querySelectorAll('.gantt-row').forEach(row => row.classList.toggle('hidden', row.dataset.late !== '1')); }}
-    function showAllRows(){{ document.getElementById('search').value=''; expandAll(); }}
     
+    // FILTRO AVANÇADO ATUALIZADO (Busca de Texto + Combo de Gravidade)
     function filterRows(){{
-        const q=document.getElementById('search').value.toLowerCase().trim();
-        if(!q){{renderVisibility();return;}}
+        const q = document.getElementById('search').value.toLowerCase().trim();
+        const grav = document.getElementById('gravFilter').value;
+        
+        if(!q && grav === "all"){{ renderVisibility(); return; }}
         expandAll();
+        
         document.querySelectorAll('.gantt-row').forEach(row => {{
             const t = byUid[row.dataset.uid];
-            row.classList.toggle('hidden', !(`${{t.name}} ${{t.status}}`.toLowerCase().includes(q)));
+            const textMatch = (`${{t.name}} ${{t.status}} ${{t.delay_tag}}`).toLowerCase().includes(q);
+            const gravMatch = (grav === "all" || row.dataset.grav === grav);
+            
+            // Fases sumárias aparecem se o usuário estiver só digitando texto pra não perder contexto
+            // Mas se ele usar o filtro de anomalia, ocultamos as fases se não tiverem erro.
+            if(t.children > 0 && grav !== "all") {{
+                 row.classList.add('hidden'); // Simplified: Hides summaries during hard gravity filtering
+            }} else {{
+                 row.classList.toggle('hidden', !(textMatch && gravMatch));
+            }}
         }});
     }}
     
