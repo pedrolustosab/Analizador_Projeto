@@ -22,7 +22,7 @@ def load_playbook():
 
 playbook_content = load_playbook()
 
-# CSS SaaS Premium
+# CSS SaaS Premium (Forçando 100% de largura de ponta a ponta)
 st.markdown("""
     <style>
     header {display: none !important;}
@@ -32,7 +32,14 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none !important;}
     
     .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 3rem !important; max-width: 1400px; }
+    
+    /* FORÇA A TELA 100% DE PONTA A PONTA */
+    .block-container { 
+        padding-top: 2rem !important; 
+        max-width: 100% !important; 
+        padding-left: 2rem !important; 
+        padding-right: 2rem !important; 
+    }
     
     /* Upload Dropzone SaaS */
     [data-testid="stFileUploadDropzone"] {
@@ -76,7 +83,7 @@ if not uploaded_file:
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                 PROCESSAMENTO 100% NO NAVEGADOR
             </div>
-            <h1 style="color: #0f172a; font-size: 3.5rem; letter-spacing: -1.5px; margin-bottom: 16px;">
+            <h1 style="color: #0f172a; font-size: 3.5rem; letter-spacing: -1.5px; margin-top: 24px; margin-bottom: 16px;">
                 PMO Intel <span style="color: #0284c7;">Engine</span>
             </h1>
             <p style="color: #64748b; font-size: 1.1rem; max-width: 600px; margin: 0 auto;">
@@ -103,7 +110,7 @@ else:
             app_data = parse_xml_to_json(uploaded_file.getvalue())
             html_string = get_html_template(app_data)
             
-            # Cabeçalho do App com os DOIS botões (Playbook e Relatório)
+            # Cabeçalho do App de ponta a ponta
             c1, c2, c3 = st.columns([4, 1.5, 1.5])
             with c1:
                 st.markdown(f"### 📊 Dashboard: **{app_data['proj_name']}**")
