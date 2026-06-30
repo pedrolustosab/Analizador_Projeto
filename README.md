@@ -1,139 +1,106 @@
 <div align="center">
 
-# 📊 Cock do PMO
+# 💎 PMO Intel Engine
 
-**Dashboard executivo inteligente para gestão de projetos com análise avançada de cronograma e custos**
+**Diagnostic Analytics & EVM Dashboard para Microsoft Project**
 
-[![Python](https://img.shields.io/badge/Python-3.12+-3776ab?style=flat-square&logo=python)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Latest-FF4B4B?style=flat-square&logo=streamlit)](https://streamlit.io/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Pandas](https://img.shields.io/badge/Pandas-Engine-150458?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-[Funcionalidades](#-funcionalidades-principais) • [Instalação](#-instalação-e-execução) • [Estrutura](#-estrutura-do-projeto) • [Como Usar](#-como-preparar-seu-arquivo-xml)
-
-</div>
-
----
-
-## 📋 Visão Geral
-
-Este projeto é um **Dashboard Executivo** desenvolvido para transformar dados brutos exportados do Microsoft Project (XML) em um cockpit interativo, offline e de alto impacto visual — ideal para apresentações C-Level.
-
-A solução utiliza **Python**, **Streamlit** e **Engenharia de Dados** para entregar métricas avançadas de gestão de projetos, incluindo:
-- ✅ Análise de Valor Agregado (EVM/EVA)
-- ✅ Cronograma com Gantt Interativo
-- ✅ Análise de Performance (SPI/CPI)
-- ✅ Identificação automática de atrasos
-
----
-
-## 🚀 Funcionalidades Principais
-
-O Dashboard foi modularizado em seções estratégicas para máxima usabilidade:
-
-| 📈 **Resumo do Prazo** | Visão geral da saúde do projeto, data base, tarefas mapeadas e índices de performance (SPI e CPI) |
-|---|---|
-| **⏱️ Gantt Interativo** | Cronograma visual com Drilldown (WBS). Expanda/recolha fases, compare Baseline vs. Realizado e acesse detalhes modais |
-| **⚠️ Painel de Atrasos** | Classificação inteligente com 3 tipos:<br>• **TIPO 1:** Não iniciou<br>• **TIPO 2:** Em andamento com estouro projetado<br>• **TIPO 3:** Deveria estar 100% concluída |
-| **💰 Curva S & EVM** | Gráfico cumulativo de Valor Agregado dinâmico com PV (VP), EV (VA) e AC (CR) |
-| **📥 Exportação HTML** | Relatório portátil e 100% offline para compartilhamento |
-
----
-
-## 🛠️ Tecnologias
-
-<div align="center">
-
-| Categoria | Tecnologia |
-|:---:|:---|
-| **Linguagem** | Python 3.12+ |
-| **Framework Web** | Streamlit |
-| **Processamento** | Pandas, NumPy |
-| **Frontend** | HTML5, CSS3, Tailwind CSS |
-| **Gráficos** | SVG nativo via Python (0 deps externas) |
+[Proposta de Valor](#-a-proposta-de-valor) • [Features Core](#-features-core-c-level) • [Arquitetura](#-arquitetura-técnica) • [Quickstart](#-quickstart-como-rodar)
 
 </div>
+
+---
+
+## 🎯 A Proposta de Valor
+
+Arquivos nativos do Microsoft Project (`.mpp` ou `.xml`) são robustos, mas oferecem uma péssima experiência de usuário (UX) para diretores e stakeholders. **Eles não querem ver linhas infinitas; eles querem saber onde o projeto está sangrando.**
+
+O **PMO Intel Engine** é uma aplicação SaaS *In-Memory* que minera a estrutura analítica de um cronograma XML e a converte instantaneamente em um **Cockpit Executivo Interativo**. Zero banco de dados. Zero envio de informações para a nuvem. Processamento 100% local com exportação de relatórios HTML portáteis.
+
+---
+
+## ✨ Features Core (C-Level)
+
+### 🚨 1. Matriz de Gravidade (Diagnostic Analytics)
+O sistema não diz apenas se a tarefa está "Atrasada". O algoritmo em Python cruza o avanço físico, o tempo decorrido, a linha de base e os gargalos de predecessoras para taguear as anomalias em 3 Filas de Ação:
+*   🔴 **Fila de Incêndio:** Marcos Rompidos, Estouro Real e Efeito Dominó.
+*   🟠 **Fila de Atenção:** Inércia de Início, Desvio Projetado e Alerta de Ritmo.
+*   🟣 **Auditoria:** Cronograma Maquiado ou Absorvido no Crítico.
+
+### 💰 2. Motor EVM (Earned Value Management)
+Cálculo automatizado a prova de falhas matemáticas (divisão por zero) para métricas globais de projeto:
+*   **Curva S Dinâmica** renderizada em SVG puro (sem pacotes pesados).
+*   Índices de Performance de Prazo (**SPI**) e Custo (**CPI**).
+*   Variações Financeiras (**SV**, **CV**) e Projeções Finais (**EAC**, **VAC**).
+
+### 📊 3. Gantt Interativo & Tracker
+*   **Tracker de Delivery:** Linha do tempo visual no topo do relatório focada apenas nos *Milestones* (Marcos).
+*   **WBS Drill-down:** Tabela de Gantt expansível com menu em cascata para isolar e inspecionar apenas tarefas com anomalias de Causa Raiz.
+
+### 📥 4. Exportação "Single-File" HTML
+Todo o dashboard (com os modais pop-up, CSS, JavaScript e Dados) é compactado e encodado em um único arquivo `.html`. O gestor baixa o arquivo e o envia via e-mail ou WhatsApp para a diretoria, que o abre interativamente no celular, **totalmente offline**.
+
+---
+
+## 🧠 Arquitetura Técnica
+
+Este projeto foi arquitetado com foco em **Clean Code**, separação de responsabilidades (MVC) e *Tolerância a Falhas*.
+
+| Módulo | Responsabilidade | Stack / Lógica |
+| :--- | :--- | :--- |
+| `app.py` | Controller & View | Streamlit atuando como Landing Page. CSS injetado para overriding de componentes nativos (Look & Feel SaaS). |
+| `data_engine.py` | Model & Business Rules | **Pandas** + `xml.etree`. Onde a mágica matemática acontece. Extrai dependências e processa a Matriz de Gravidade. |
+| `html_generator.py` | UI/UX Renderer | Gera a interface Executiva, constrói os SVGs matematicamente e injeta o JavaScript para os filtros e *Drill-down*. |
+
+> **Tech Flex:** Para evitar *warnings* de depreciação visual do Streamlit ao injetar iframes pesados, o HTML gerado pelo backend é encodado em **Base64** e injetado via Data URI (`data:text/html;base64,...`), garantindo uma renderização 100% edge-to-edge na tela.
 
 ---
 
 ## 📂 Estrutura do Projeto
 
-```
-analizador-projeto/
-├── app.py                    # Interface Streamlit e renderização
-├── data_engine.py            # Motor de processamento WBS e cálculos EVM
-├── html_generator.py         # Geração de HTML, Tailwind e SVG
-├── requirements.txt          # Dependências Python
-├── sample.xml               # Arquivo de exemplo
-├── README.md                # Esta documentação
-└── .streamlit/              # Configuração Streamlit
+```text
+pmo-intel-engine/
+├── .streamlit/
+│   └── config.toml           # Oculta menus padrão do Streamlit (UI Premium)
+├── app.py                    # Interface de Upload e Controller principal
+├── data_engine.py            # Motor de mineração XML, WBS e EVM
+├── html_generator.py         # Template HTML5/CSS3/JS e gráficos SVG
+├── playbook.html             # Manual de Adoção Corporativa (Embutido no App)
+├── requirements.txt          # Dependências
+├── sample.xml                # Arquivo de exemplo com custos, baselines e atrasos
+└── README.md                 # Esta documentação
 ```
 
 ---
 
-## 📦 Instalação e Execução
+## ⚡ Quickstart (Como Rodar)
 
-### 1️⃣ Clonar o Repositório
+**Pré-requisitos:** Python 3.10 ou superior.
 
+1. **Clone o Repositório:**
 ```bash
-git clone https://github.com/pedrolustosab/Analizador_Projeto.git
-cd Analizador_Projeto
+git clone https://github.com/seu-usuario/pmo-intel-engine.git
+cd pmo-intel-engine
 ```
 
-### 2️⃣ Instalar Dependências
-
+2. **Instale as dependências (Apenas Pandas e Streamlit):**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3️⃣ Executar a Aplicação
-
+3. **Inicie a Engine Executiva:**
 ```bash
 streamlit run app.py
 ```
 
-A aplicação abrirá automaticamente em `http://localhost:8501`
-
----
-
-## 💡 Como Preparar seu Arquivo XML
-
-Para extrair o máximo de informações (EVM, variações e análises), siga estes passos no **Microsoft Project**:
-
-### ✅ Pré-requisitos
-
-1. **Salve uma Linha de Base (Baseline)**
-   - Acesse: Projeto → Definir Linha de Base
-   - Isso permite comparar Planejado vs. Realizado
-
-2. **Atribua Custos e Recursos**
-   - Garanta que as tarefas possuem custos ou recursos
-   - Necessário para gerar BAC, PV e AC
-
-3. **Exporte como XML**
-   - Arquivo → Salvar Como
-   - Selecione formato: **XML do Microsoft Project (*.xml)**
-
-4. **Carregue no Dashboard**
-   - Use o menu lateral para fazer upload do arquivo gerado
-   - O dashboard processará automaticamente!
-
-### 📊 Resultado Esperado
-
-Após o upload, você terá acesso a:
-- Análise de prazo e custos em tempo real
-- Gráficos interativos e exportáveis
-- Relatório completo em HTML
-
----
-
-## 🎓 Autor
-
-Desenvolvido por **Pedro Lustosa** como projeto de excelência para o Bootcamp de AI.
+> **Para testar:** Use o arquivo `sample.xml` incluso no repositório. Ele já contém a Linha de Base salva, orçamentos (BAC) e anomalias plantadas para disparar a Matriz de Gravidade.
 
 ---
 
 <div align="center">
-
-**[⬆ Voltar ao topo](#cockpit-executivo--eva--gantt--pert)**
-
+  <p>Desenvolvido com 💡 e IA como projeto de excelência Analítica e de Automação.</p>
 </div>
