@@ -3,16 +3,19 @@ import xml.etree.ElementTree as ET
 import io
 
 def parse_xml_to_json(file_bytes):
+    # Inicializa o parser XML
     tree = ET.parse(io.BytesIO(file_bytes))
     root = tree.getroot()
     ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
     
+    # Informações gerais do Projeto
     proj_name = root.find(f'.//{ns}Title')
     proj_name = proj_name.text if proj_name is not None else "Projeto Executivo"
     
     sd_node = root.find(f'.//{ns}StatusDate')
     status_date = pd.to_datetime(sd_node.text).tz_localize(None) if sd_node is not None else pd.Timestamp.now()
 
+    # Mapeamento de Recursos e Atribuições
     resources = {res.find(f'{ns}UID').text: res.find(f'{ns}Name').text 
                  for res in root.findall(f'.//{ns}Resource') 
                  if res.find(f'{ns}UID') is not None and res.find(f'{ns}Name') is not None and res.find(f'{ns}Name').text}
@@ -23,6 +26,7 @@ def parse_xml_to_json(file_bytes):
         if t_uid is not None and r_uid is not None and r_uid.text in resources:
             assignments.setdefault(t_uid.text, []).append(resources[r_uid.text])
                 
+    # Extração das Tarefas
     tasks_raw = []
     for seq, task in enumerate(root.findall(f'.//{ns}Task')):
         uid = task.find(f'{ns}UID')
@@ -33,18 +37,21 @@ def parse_xml_to_json(file_bytes):
         try: row_id = int(id_node.text)
         except: row_id = seq
 
+        # WBS - Estrutura Analítica para ordenação exata
         out_node = task.find(f'{ns}OutlineNumber')
         out_str = out_node.text if out_node is not None and out_node.text else ""
         try: wbs_tuple = tuple(int(x) for x in out_str.split('.') if x.isdigit())
         except: wbs_tuple = ()
         if not wbs_tuple: wbs_tuple = (999999, seq)
         
+        # Datas e Progresso
         start, finish = task.find(f'{ns}Start'), task.find(f'{ns}Finish')
         b_start, b_finish = task.find(f'.//{ns}Baseline/{ns}Start'), task.find(f'.//{ns}Baseline/{ns}Finish')
         pct = task.find(f'{ns}PercentComplete')
         lvl = task.find(f'{ns}OutlineLevel')
         milestone = task.find(f'{ns}Milestone')
         
+        # Mineração para Matriz de Causas (Caminho Crítico e Predecessoras)
         crit_node = task.find(f'{ns}Critical')
         is_critical = True if crit_node is not None and crit_node.text == '1' else False
         
@@ -53,9 +60,9 @@ def parse_xml_to_json(file_bytes):
             p_uid = p_link.find(f'{ns}PredecessorUID')
             if p_uid is not None: preds.append(p_uid.text)
         
+        # Custos
         cost, ac_node = task.find(f'{ns}Cost'), task.find(f'{ns}ActualCost')
         b_cost = task.find(f'.//{ns}Baseline/{ns}Cost')
-        
         cost_val = float(cost.text) if cost is not None and cost.text else 0.0
         b_cost_val = float(b_cost.text) if b_cost is not None and b_cost.text else cost_val
         
@@ -76,10 +83,12 @@ def parse_xml_to_json(file_bytes):
     df = pd.DataFrame(tasks_raw).dropna(subset=['start', 'end'])
     if df.empty: return {}
     
+    # Tratamento e Ordenação
     df = df.sort_values(['wbs_tuple', 'id'])
     df['b_start'] = df['b_start'].fillna(df['start'])
     df['b_end'] = df['b_end'].fillna(df['end'])
     
+    # Descoberta Hierárquica (Pais e Filhos)
     df['parent'] = ""
     last_uids = {}
     for idx, row in df.iterrows():
@@ -90,11 +99,13 @@ def parse_xml_to_json(file_bytes):
     parent_counts = df['parent'].value_counts().to_dict()
     df['children'] = df['uid'].map(lambda x: parent_counts.get(x, 0))
 
+    # Diagnóstico Base
     df['sv_days'] = (df['end'] - df['b_end']).dt.days
     df['status'] = "No Prazo"
     df.loc[df['pct'] == 100, 'status'] = "Concluída"
     df.loc[(df['pct'] < 100) & ((df['sv_days'] > 0) | (df['end'] < status_date)), 'status'] = "Atrasada"
 
+    # Cálculos EVM
     def calc_pv(x):
         if x['b_end'] <= status_date: return x['bac']
         if x['b_start'] <= status_date:
@@ -116,12 +127,14 @@ def parse_xml_to_json(file_bytes):
     tot_days = (max_date - min_date).days if (max_date - min_date).days > 0 else 1
     today_pct = max(0, min(100, (status_date - min_date).days / tot_days * 100))
 
-    # --- NOVO: ENGINE DE MATRIZ DE GRAVIDADE (8 TAGS) ---
+    # ==========================================
+    # ENGINE DE MATRIZ DE GRAVIDADE (8 TAGS)
+    # ==========================================
     task_pct_map = df.set_index('uid')['pct'].to_dict()
-    matrix_counts = {"critico": 0, "atencao": 0, "auditoria": 0}
+    matrix_counts = {"critico": 0, "atencao": 0, "auditoria": 0, "total": 0}
 
     def get_delay_analytics(r):
-        if r['children'] > 0: return "", "", "" # Não aplica tag em fases sumárias
+        if r['children'] > 0: return "", "", "" # Não avalia fases sumárias
         
         if r['pct'] == 100:
             if r['end'] > r['b_end'] and r['is_critical']:
@@ -145,7 +158,7 @@ def parse_xml_to_json(file_bytes):
             dur = (r['end'] - r['start']).days
             if dur > 0:
                 exp_pct = ((status_date - r['start']).days / dur) * 100
-                if exp_pct > r['pct'] + 15: # Threshold de 15% de descompasso rítmico
+                if exp_pct > r['pct'] + 15: # 15% de descompasso dispara o alerta
                     return "T6: Alerta de Ritmo", "atencao", "orange"
                     
         if 0 < r['pct'] < 100 and r['end'] > r['b_end']:
@@ -156,6 +169,7 @@ def parse_xml_to_json(file_bytes):
             
         return "", "", ""
 
+    # Preparação para o Render no Frontend
     tasks_out = []
     for _, r in df.iterrows():
         b_l = max(0, (r['b_start'] - min_date).days / tot_days * 100)
@@ -168,9 +182,11 @@ def parse_xml_to_json(file_bytes):
         if r['children'] > 0 and r['pct'] < 100: bar_cls = 'phase'
         if r['isMilestone']: bar_cls += ' milestone'
 
-        # Aplica a Função Analítica
+        # Roda a função analítica
         delay_tag, delay_grav, delay_color = get_delay_analytics(r)
-        if delay_grav: matrix_counts[delay_grav] += 1
+        if delay_grav: 
+            matrix_counts[delay_grav] += 1
+            matrix_counts["total"] += 1
 
         tasks_out.append({
             'uid': r['uid'], 'parent': r['parent'], 'children': r['children'], 'name': r['name'], 'owner': r['owner'],
@@ -184,21 +200,30 @@ def parse_xml_to_json(file_bytes):
             'spi': r['ev'] / r['pv'] if r['pv'] > 0 else 1.0, 'cpi': r['ev'] / r['ac'] if r['ac'] > 0 else 1.0
         })
 
-    # Timeline (Marcos)
+    # ==========================================
+    # ENGINE DA LINHA DO TEMPO (MARCOS)
+    # ==========================================
     milestones_timeline = []
     has_active = False
     m_df = df[df['isMilestone'] == True].sort_values('end')
+    
     for _, r in m_df.iterrows():
         clean_name = r['name'].replace("Marco: ", "").replace("Marco ", "")
-        if r['pct'] == 100: m_state = 'completed'
+        
+        if r['pct'] == 100:
+            m_state = 'completed'
         elif r['end'] <= status_date and r['pct'] < 100:
             m_state = 'active-late' if not has_active else 'late'
             has_active = True
         else:
             m_state = 'active' if not has_active else 'pending'
             has_active = True
+            
         milestones_timeline.append({'name': clean_name, 'date': r['end'].strftime('%d %b'), 'state': m_state})
 
+    # ==========================================
+    # ENGINE DO GRÁFICO (CURVA S)
+    # ==========================================
     max_money = max(bac, eac) * 1.1 if max(bac, eac) > 0 else 1
     def g_x(d): return 80 + ((d - min_date).days / tot_days) * 1100
     def g_y(v): return 340 - (v / max_money) * 320
@@ -223,7 +248,7 @@ def parse_xml_to_json(file_bytes):
         "spi": spi, "cpi": cpi, "bac": bac, "pv": pv, "ev": ev, "ac": ac, "eac": eac, "vac": bac - eac, "sv": ev - pv, "cv": ev - ac,
         "has_finance": has_finance,
         "today_pct": f"{today_pct:.2f}%", "tasks": tasks_out, "milestones": milestones_timeline,
-        "matrix": matrix_counts, # ENVIANDO A MATRIZ PARA O HTML
+        "matrix": matrix_counts,
         "chart": {
             "pv_pts": " ".join(pv_pts), "ev_pts": " ".join(ev_pts), "ac_pts": " ".join(ac_pts), 
             "fc_ev": f"{g_x(status_date):.1f},{g_y(c_ev):.1f} {g_x(max_date):.1f},{g_y(bac):.1f}", 

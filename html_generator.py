@@ -3,18 +3,15 @@ import json
 def get_html_template(d):
     fmt = lambda x: f"R$ {x/1000:,.1f}k".replace(',', 'X').replace('.', ',').replace('X', '.')
     
-    # 1. Montagem das Linhas do Gantt (com as Tags de Causa Raiz)
+    # 1. Gantt HTML
     gantt_html = ""
     for t in d['tasks']:
         pad = (t['level'] - 1) * 18
         hidden = "hidden" if t['parent'] else ""
         late_val = "1" if t['status'] == 'Atrasada' else "0"
-        
         toggle = f"<span class='toggle' id='tg-{t['uid']}'>+</span>" if t['children'] > 0 else f"<span class='toggle dot'></span>"
         fw = "fw-bold" if t['children'] > 0 else ""
         sv_str = f"+{t['svd']}d" if t['svd'] > 0 else f"{t['svd']}d"
-
-        # Badge da Causa Raiz (Aparece ao lado do Status)
         cause_badge = f"<span class='tag cause-{t['delay_color']}'>{t['delay_tag']}</span>" if t['delay_tag'] else ""
 
         gantt_html += f"""
@@ -31,22 +28,23 @@ def get_html_template(d):
             <div class='pct'>{t['pct']}%</div>
         </div>"""
 
-    # 2. Montagem Tabela de Atrasos com Nova Coluna Analítica
+    # 2. Tabela de Atrasos Dinâmica
     delays_html = ""
     lates = [t for t in d['tasks'] if t['delay_tag'] != "" and t['children'] == 0]
-    lates.sort(key=lambda x: (x['delay_color'] == 'red', x['svd']), reverse=True) # Prioriza os vermelhos
+    lates.sort(key=lambda x: (x['delay_color'] == 'red', x['svd']), reverse=True)
     for t in lates:
         badge = f"<span class='tag cause-{t['delay_color']}'>{t['delay_tag']}</span>"
-        delays_html += f"<tr onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{badge}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
-    if not delays_html: delays_html = "<tr><td colspan='7' style='text-align:center;'>Nenhuma anomalia detectada no momento.</td></tr>"
+        t_id = t['delay_tag'][:2] # Pega T1, T2, etc para o filtro
+        delays_html += f"<tr class='delay-tr' data-grav='{t['delay_grav']}' data-tag='{t_id}' onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{badge}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
+    if not delays_html: delays_html = "<tr id='no-delay-msg'><td colspan='7' style='text-align:center;'>Nenhuma anomalia detectada no momento.</td></tr>"
 
-    # 3. Lógica do Tracker de Marcos
+    # 3. Tracker HTML
     tracker_html = ""
     for m in d['milestones']:
         tracker_html += f"<li class='step {m['state']}'><div class='node'></div><p>{m['name']}</p><small>{m['date']}</small></li>"
     if not tracker_html: tracker_html = "<li class='step pending'><p>Nenhum marco cadastrado</p></li>"
 
-    # 4. Lógica Financeira 
+    # 4. EVM HTML
     if d['has_finance']:
         spi_str, cpi_str, pct_fin_str = f"{d['spi']:.2f}", f"{d['cpi']:.2f}", f"{d['pct_fin']:.1f}%"
         fin_warn_bar = "warnbar" if d['pct_fin'] > d['pct_phys'] else ""
@@ -66,18 +64,20 @@ def get_html_template(d):
                 <td class='{'pos' if t['spi']>=1 else 'neg'}'>{t['spi']:.2f}</td><td class='{'pos' if t['cpi']>=1 else 'neg'}'>{t['cpi']:.2f}</td>
             </tr>"""
 
+        # EVA GRID AGORA COM 5 COLUNAS x 2 LINHAS
         eva_content = f"""
             <div class='eva-grid'>
                 <div class='eva-card'><span>Budget (BAC)</span><b>{fmt(d['bac'])}</b></div>
                 <div class='eva-card'><span>Planejado (PV)</span><b>{fmt(d['pv'])}</b></div>
                 <div class='eva-card'><span>Agregado (EV)</span><b>{fmt(d['ev'])}</b></div>
                 <div class='eva-card'><span>Custo Real (AC)</span><b>{fmt(d['ac'])}</b></div>
+                <div class='eva-card'><span>Estimativa (EAC)</span><b>{fmt(d['eac'])}</b></div>
+                
                 <div class='eva-card'><span>Var. Prazo (SV)</span><b class='{'pos' if d['sv']>=0 else 'neg'}'>{fmt(d['sv'])}</b></div>
                 <div class='eva-card'><span>Var. Custo (CV)</span><b class='{'pos' if d['cv']>=0 else 'neg'}'>{fmt(d['cv'])}</b></div>
-                <div class='eva-card'><span>SPI</span><b class='{'pos' if d['spi']>=1 else 'neg'}'>{d['spi']:.2f}</b></div>
-                <div class='eva-card'><span>CPI</span><b class='{'pos' if d['cpi']>=1 else 'neg'}'>{d['cpi']:.2f}</b></div>
-                <div class='eva-card'><span>EAC</span><b>{fmt(d['eac'])}</b></div>
-                <div class='eva-card'><span>VAC</span><b class='{'pos' if d['vac']>=0 else 'neg'}'>{fmt(d['vac'])}</b></div>
+                <div class='eva-card'><span>Índice Prazo (SPI)</span><b class='{'pos' if d['spi']>=1 else 'neg'}'>{d['spi']:.2f}</b></div>
+                <div class='eva-card'><span>Índice Custo (CPI)</span><b class='{'pos' if d['cpi']>=1 else 'neg'}'>{d['cpi']:.2f}</b></div>
+                <div class='eva-card'><span>Desvio Proj. (VAC)</span><b class='{'pos' if d['vac']>=0 else 'neg'}'>{fmt(d['vac'])}</b></div>
             </div>
             
             <div class='svg-container'>
@@ -106,7 +106,15 @@ def get_html_template(d):
                     </svg>
                 </div>
             </div>
-            <div class='tw' style='margin-top:16px;'><table><thead><tr><th>Estrutura Analítica</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{eva_rows_html}</tbody></table></div>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:32px; margin-bottom:12px;">
+                <h3 style="font-size:18px; color:#1e293b; margin:0;">Extrato Financeiro (WBS)</h3>
+                <div class="gantt-tools" style="margin:0;">
+                    <button onclick='expandAll()'>Expandir Tudo</button>
+                    <button onclick='collapseAll()'>Recolher Tudo</button>
+                </div>
+            </div>
+            <div class='tw'><table><thead><tr><th>Estrutura Analítica</th><th>BAC</th><th>PV</th><th>EV</th><th>AC</th><th>SV</th><th>CV</th><th>SPI</th><th>CPI</th></tr></thead><tbody>{eva_rows_html}</tbody></table></div>
         """
     else:
         spi_str, cpi_str, pct_fin_str, fin_warn_bar, fin_bar_width = "N/D", "N/D", "N/D", "", "0%"
@@ -119,7 +127,7 @@ def get_html_template(d):
     <style>
         :root{{--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--red:#e11d48;--green:#059669;--amber:#ea580c; --blue:#0284c7; --blue-light:#0ea5e9;}}
         *{{box-sizing:border-box}}
-        body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}}
+        body{{margin:0;background:#f8fafc;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; padding-bottom:100px;}}
         .shell{{max-width:100%;margin:0 auto;padding:0 32px;}}
         
         .hero{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;background:linear-gradient(135deg,#0f172a,#1e293b 56%,#334155);border-radius:24px;padding:32px;color:#fff;box-shadow:0 10px 25px rgba(15,23,42,.15)}}
@@ -137,8 +145,12 @@ def get_html_template(d):
         .section{{background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;margin-top:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.05)}}
         h2{{margin:0 0 20px 0;font-size:20px; letter-spacing: -0.5px; color: #1e293b;}}
         
-        .kpis,.eva-grid,.progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
+        .kpis, .progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
         .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
+        
+        /* AQUI A MÁGICA DOS 10 CARDS (5 Colunas) */
+        .eva-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}}
+        
         .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
         .kpi span,.eva-card span,.progress-card span{{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:700; letter-spacing: 0.5px;}}
         .kpi span{{text-align:center}}
@@ -176,26 +188,27 @@ def get_html_template(d):
         .tag{{display:inline-flex;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700; margin-left: 6px; letter-spacing: 0.5px;}}
         .done{{background:#d1fae5;color:#047857}}.planned{{background:#e0f2fe;color:#0369a1}}.late-tag{{background:#ffe4e6;color:#be123c}}
         
-        /* TAGS DE CAUSA RAIZ (Matriz de Gravidade) */
         .cause-red {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }}
         .cause-orange {{ background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }}
         .cause-purple {{ background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }}
         
-        /* CARDS DA MATRIZ DE GRAVIDADE */
-        .grav-matrix {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }}
+        /* MATRIZ COM TOTALIZADOR (4 Colunas) */
+        .grav-matrix {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }}
         .grav-card {{ padding: 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); }}
+        .grav-card.g-total {{ background: #f8fafc; border-color: #cbd5e1; }}
         .grav-card.g-red {{ background: #fef2f2; border-color: #fca5a5; }}
         .grav-card.g-orange {{ background: #fff7ed; border-color: #fdba74; }}
         .grav-card.g-purple {{ background: #faf5ff; border-color: #d8b4fe; }}
         .grav-info h4 {{ margin: 0 0 4px 0; font-size: 15px; color: #0f172a; }}
         .grav-info p {{ margin: 0; font-size: 12px; color: #475569; }}
         .grav-num {{ font-size: 32px; font-weight: 700; }}
-        .g-red .grav-num {{ color: #b91c1c; }} .g-orange .grav-num {{ color: #c2410c; }} .g-purple .grav-num {{ color: #7e22ce; }}
+        .g-total .grav-num {{ color: #334155; }} .g-red .grav-num {{ color: #b91c1c; }} .g-orange .grav-num {{ color: #c2410c; }} .g-purple .grav-num {{ color: #7e22ce; }}
 
         table{{width:100%;border-collapse:collapse;font-size:13px}}
         th{{text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding:12px 10px; font-weight: 700;}}
         td{{border-bottom:1px solid #f1f5f9;padding:12px 10px; color: #334155;}}
         tr:hover td{{background: #f8fafc;}}
+        .delay-tr {{ cursor: pointer; transition: background 0.2s; }}
         
         .modal-backdrop{{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:99; backdrop-filter: blur(4px);}}
         .modal-backdrop.flex{{display:flex}}
@@ -227,6 +240,13 @@ def get_html_template(d):
         .late::after {{ background: #f43f5e; }}
         @keyframes pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(14, 165, 233, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }} }}
         @keyframes pulseLate {{ 0% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }} }}
+
+        /* GLOSSÁRIO */
+        .glossary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+        .glossary-box { background: #fff; padding: 24px; border: 1px solid var(--line); border-radius: 16px; }
+        .glossary-box h3 { color: #0ea5e9; font-size: 16px; margin: 0 0 16px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;}
+        .glossary-item { margin-bottom: 12px; font-size: 13px; line-height: 1.5; color: #475569;}
+        .glossary-item b { color: #0f172a; }
     </style>
     </head>
     <body><div class='shell'>
@@ -248,6 +268,7 @@ def get_html_template(d):
             <a href='#atrasos'>Causa Raiz & Atrasos</a>
             <a href='#gantt'>Gantt Interativo</a>
             <a href='#eva'>Curva S (EVM)</a>
+            <a href='#glossario'>Glossário</a>
         </nav>
         
         <section class='section' id='prazo'><h2>Diagnóstico de Cronograma</h2>
@@ -274,18 +295,21 @@ def get_html_template(d):
             </div>
         </section>
 
-        <!-- NOVO: MATRIZ DE GRAVIDADE C-LEVEL -->
         <section class='section' id='atrasos'>
             <h2>Matriz de Gravidade (Análise de Causas)</h2>
             <p style="color:#64748b; font-size:14px; margin-top:-12px; margin-bottom:20px;">Classificação inteligente de desvios no cronograma (Apenas tarefas folha).</p>
             
             <div class="grav-matrix">
+                <div class="grav-card g-total">
+                    <div class="grav-info"><h4>📋 Total de Anomalias</h4><p>Tarefas mapeadas fora do padrão ideal.</p></div>
+                    <div class="grav-num">{d['matrix'].get('total', 0)}</div>
+                </div>
                 <div class="grav-card g-red">
-                    <div class="grav-info"><h4>🔴 Fila de Incêndio</h4><p>Marcos Rompidos, Estouro Real e Efeito Dominó.</p></div>
+                    <div class="grav-info"><h4>🔴 Fila de Incêndio</h4><p>Marcos Rompidos, Estouro Real ou Efeito Dominó.</p></div>
                     <div class="grav-num">{d['matrix'].get('critico', 0)}</div>
                 </div>
                 <div class="grav-card g-orange">
-                    <div class="grav-info"><h4>🟠 Fila de Atenção</h4><p>Inércia, Alerta de Ritmo e Desvio Projetado.</p></div>
+                    <div class="grav-info"><h4>🟠 Fila de Atenção</h4><p>Inércia, Alerta de Ritmo ou Desvio Projetado.</p></div>
                     <div class="grav-num">{d['matrix'].get('atencao', 0)}</div>
                 </div>
                 <div class="grav-card g-purple">
@@ -294,8 +318,29 @@ def get_html_template(d):
                 </div>
             </div>
 
+            <!-- FILTROS DA TABELA DE ATRASOS -->
+            <div class='gantt-tools' style='margin-bottom: 12px; justify-content: flex-start;'>
+                <select id="delayGravFilter" onchange="filterDelayTable()">
+                    <option value="all">Todas as Gravidades</option>
+                    <option value="critico">🔴 Apenas Incêndio</option>
+                    <option value="atencao">🟠 Apenas Atenção</option>
+                    <option value="auditoria">🟣 Apenas Auditoria</option>
+                </select>
+                <select id="delayTagFilter" onchange="filterDelayTable()">
+                    <option value="all">Todos os Motivos</option>
+                    <option value="T1">T1: Inércia</option>
+                    <option value="T2">T2: Estouro Real</option>
+                    <option value="T3">T3: Desvio Projetado</option>
+                    <option value="T4">T4: Maquiado</option>
+                    <option value="T5">T5: Absorvido</option>
+                    <option value="T6">T6: Alerta de Ritmo</option>
+                    <option value="T7">T7: Marco Rompido</option>
+                    <option value="T8">T8: Efeito Dominó</option>
+                </select>
+            </div>
+
             <div class='tw'><table><thead><tr><th>UID</th><th>Tarefa</th><th>Responsável</th><th>Motivo Analítico</th><th>Progresso</th><th>Baseline Fim</th><th>Variação</th></tr></thead>
-            <tbody>{delays_html}</tbody></table></div>
+            <tbody id="delay-tbody">{delays_html}</tbody></table></div>
         </section>
         
         <section class='section' id='gantt'><h2>Gantt Interativo (WBS)</h2>
@@ -303,15 +348,14 @@ def get_html_template(d):
                 <div style="display:flex; gap:12px;">
                     <button onclick='expandAll()'>Expandir Tudo</button>
                     <button onclick='collapseAll()'>Recolher Tudo</button>
-                    <!-- NOVO FILTRO DE CAUSA RAIZ -->
-                    <select id="gravFilter" onchange="filterRows()">
-                        <option value="all">Todas as Tarefas</option>
-                        <option value="critico">Somente 🔴 Incêndio</option>
-                        <option value="atencao">Somente 🟠 Atenção</option>
-                        <option value="auditoria">Somente 🟣 Auditoria</option>
+                    <select id="gravFilter" onchange="filterGantt()">
+                        <option value="all">Ver Todas as Tarefas</option>
+                        <option value="critico">Focar em 🔴 Incêndio</option>
+                        <option value="atencao">Focar em 🟠 Atenção</option>
+                        <option value="auditoria">Focar em 🟣 Auditoria</option>
                     </select>
                 </div>
-                <input id='search' placeholder='Pesquisar tarefa, responsável, status...' oninput='filterRows()'>
+                <input id='search' placeholder='Pesquisar tarefa, responsável, status...' oninput='filterGantt()'>
             </div>
             <div class='gantt'>
                 {gantt_html}
@@ -320,6 +364,37 @@ def get_html_template(d):
         
         <section class='section' id='eva'><h2>Análise de Valor Agregado (EVM)</h2>
             {eva_content}
+        </section>
+
+        <!-- NOVO: GLOSSÁRIO CORPORATIVO -->
+        <section class='section' id='glossario'>
+            <h2>Dicionário de Negócios (Glossário PMO)</h2>
+            <div class="glossary-grid">
+                <div class="glossary-box">
+                    <h3>📊 Indicadores Financeiros (EVM)</h3>
+                    <div class="glossary-item"><b>BAC (Budget at Completion):</b> Orçamento total originalmente aprovado para o projeto (Linha de base).</div>
+                    <div class="glossary-item"><b>PV (Planned Value):</b> Quanto do trabalho deveria estar concluído financeiramente até hoje.</div>
+                    <div class="glossary-item"><b>EV (Earned Value):</b> O valor real do trabalho que já foi entregue físico (BAC x % Concluído).</div>
+                    <div class="glossary-item"><b>AC (Actual Cost):</b> Custo financeiro real incorrido até o momento.</div>
+                    <div class="glossary-item"><b>SPI (Schedule Performance Index):</b> Índice de Prazo. Se > 1, entregou mais rápido que o planejado. (EV/PV).</div>
+                    <div class="glossary-item"><b>CPI (Cost Performance Index):</b> Índice de Custo. Se > 1, gastou menos que o planejado. (EV/AC).</div>
+                    <div class="glossary-item"><b>SV (Schedule Variance):</b> Variação de Prazo Financeiro (EV - PV). Valores negativos indicam atraso financeiro.</div>
+                    <div class="glossary-item"><b>CV (Cost Variance):</b> Variação de Custo Real (EV - AC). Valores negativos indicam prejuízo/estouro no orçamento.</div>
+                    <div class="glossary-item"><b>EAC (Estimate at Completion):</b> Previsão atualizada de quanto o projeto custará no total (BAC / CPI).</div>
+                    <div class="glossary-item"><b>VAC (Variance at Completion):</b> Desvio projetado final do orçamento (BAC - EAC).</div>
+                </div>
+                <div class="glossary-item glossary-box">
+                    <h3>🚨 Matriz de Causas (Tags de Anomalia)</h3>
+                    <div class="glossary-item"><b>T1: Inércia (Não Iniciou)</b> 🟠 A data de início já passou e a tarefa está com 0% de avanço.</div>
+                    <div class="glossary-item"><b>T2: Estouro Real</b> 🔴 A tarefa está em andamento, mas a data de fim planejada (baseline) já estourou.</div>
+                    <div class="glossary-item"><b>T3: Desvio Projetado</b> 🟠 A data de fim projetada ultrapassou a linha de base original.</div>
+                    <div class="glossary-item"><b>T4: Cronograma Maquiado</b> 🟣 Tarefa com 0%, mas a data de início foi movida para frente artificialmente.</div>
+                    <div class="glossary-item"><b>T5: Absorvido no Crítico</b> 🟣 Tarefa 100% concluída fora do prazo, mas era caminho crítico (Lições Aprendidas).</div>
+                    <div class="glossary-item"><b>T6: Alerta de Ritmo</b> 🟠 O tempo consumido da tarefa é muito superior ao avanço físico reportado (Ex: Passou 50% dos dias, mas só avançou 10%).</div>
+                    <div class="glossary-item"><b>T7: Marco Rompido</b> 🔴 Uma grande entrega de negócio (Duração = 0d) teve sua data estourada.</div>
+                    <div class="glossary-item"><b>T8: Efeito Dominó</b> 🔴 Tarefa não andou porque uma predecessora está travando a execução.</div>
+                </div>
+            </div>
         </section>
     </div>
     
@@ -376,8 +451,8 @@ def get_html_template(d):
     function expandAll(){{ tasks.filter(t=>t.children > 0).forEach(t=>expanded.add(String(t.uid))); renderVisibility(); }}
     function collapseAll(){{ expanded.clear(); renderVisibility(); }}
     
-    // FILTRO AVANÇADO ATUALIZADO (Busca de Texto + Combo de Gravidade)
-    function filterRows(){{
+    // Filtro do Gantt
+    function filterGantt(){{
         const q = document.getElementById('search').value.toLowerCase().trim();
         const grav = document.getElementById('gravFilter').value;
         
@@ -389,14 +464,34 @@ def get_html_template(d):
             const textMatch = (`${{t.name}} ${{t.status}} ${{t.delay_tag}}`).toLowerCase().includes(q);
             const gravMatch = (grav === "all" || row.dataset.grav === grav);
             
-            // Fases sumárias aparecem se o usuário estiver só digitando texto pra não perder contexto
-            // Mas se ele usar o filtro de anomalia, ocultamos as fases se não tiverem erro.
             if(t.children > 0 && grav !== "all") {{
-                 row.classList.add('hidden'); // Simplified: Hides summaries during hard gravity filtering
+                 row.classList.add('hidden'); 
             }} else {{
                  row.classList.toggle('hidden', !(textMatch && gravMatch));
             }}
         }});
+    }}
+
+    // NOVO: Filtro da Tabela de Atrasos
+    function filterDelayTable() {{
+        const grav = document.getElementById('delayGravFilter').value;
+        const tag = document.getElementById('delayTagFilter').value;
+        let count = 0;
+        
+        document.querySelectorAll('.delay-tr').forEach(row => {{
+            const gravMatch = (grav === "all" || row.dataset.grav === grav);
+            const tagMatch = (tag === "all" || row.dataset.tag === tag);
+            
+            if (gravMatch && tagMatch) {{
+                row.classList.remove('hidden');
+                count++;
+            }} else {{
+                row.classList.add('hidden');
+            }}
+        }});
+
+        const msgRow = document.getElementById('no-delay-msg');
+        if(msgRow) msgRow.style.display = (count === 0) ? '' : 'none';
     }}
     
     function showDetail(uid){{
