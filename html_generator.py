@@ -34,7 +34,7 @@ def get_html_template(d):
     lates.sort(key=lambda x: (x['delay_color'] == 'red', x['svd']), reverse=True)
     for t in lates:
         badge = f"<span class='tag cause-{t['delay_color']}'>{t['delay_tag']}</span>"
-        t_id = t['delay_tag'][:2] # Pega T1, T2, etc para o filtro
+        t_id = t['delay_tag'][:2] # Extrai apenas T1, T2, etc para o JavaScript
         delays_html += f"<tr class='delay-tr' data-grav='{t['delay_grav']}' data-tag='{t_id}' onclick='showDetail(\"{t['uid']}\")'><td>{t['uid']}</td><td>{t['name']}</td><td>{t['owner']}</td><td>{badge}</td><td>{t['pct']}%</td><td>{t['b_finish'][:5]}</td><td class='neg'>+{t['svd']}d</td></tr>"
     if not delays_html: delays_html = "<tr id='no-delay-msg'><td colspan='7' style='text-align:center;'>Nenhuma anomalia detectada no momento.</td></tr>"
 
@@ -64,7 +64,6 @@ def get_html_template(d):
                 <td class='{'pos' if t['spi']>=1 else 'neg'}'>{t['spi']:.2f}</td><td class='{'pos' if t['cpi']>=1 else 'neg'}'>{t['cpi']:.2f}</td>
             </tr>"""
 
-        # EVA GRID AGORA COM 5 COLUNAS x 2 LINHAS
         eva_content = f"""
             <div class='eva-grid'>
                 <div class='eva-card'><span>Budget (BAC)</span><b>{fmt(d['bac'])}</b></div>
@@ -147,8 +146,6 @@ def get_html_template(d):
         
         .kpis, .progress-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}}
         .progress-grid{{grid-template-columns:repeat(3,1fr);margin-top:16px}}
-        
-        /* EVA GRID COM 5 COLUNAS */
         .eva-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}}
         
         .kpi,.eva-card,.progress-card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px; box-shadow: 0 1px 3px rgba(0,0,0,.03)}}
@@ -192,7 +189,6 @@ def get_html_template(d):
         .cause-orange {{ background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }}
         .cause-purple {{ background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }}
         
-        /* MATRIZ COM TOTALIZADOR */
         .grav-matrix {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }}
         .grav-card {{ padding: 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); }}
         .grav-card.g-total {{ background: #f8fafc; border-color: #cbd5e1; }}
@@ -241,7 +237,6 @@ def get_html_template(d):
         @keyframes pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(14, 165, 233, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }} }}
         @keyframes pulseLate {{ 0% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }} 70% {{ box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }} }}
 
-        /* GLOSSÁRIO (CSS com {{ duplicadas para o Python) */
         .glossary-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }}
         .glossary-box {{ background: #fff; padding: 24px; border: 1px solid var(--line); border-radius: 16px; }}
         .glossary-box h3 {{ color: #0ea5e9; font-size: 16px; margin: 0 0 16px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }}
@@ -276,9 +271,10 @@ def get_html_template(d):
                 <div class='kpi'><span>Total de Atividades</span><b>{d['tot_tasks']}</b><small>Tarefas e Marcos</small></div>
                 <div class='kpi'><span>Fim Planejado (BL)</span><b>{d['b_end']}</b><small>Linha de base original</small></div>
                 <div class='kpi'><span>Fim Projetado</span><b>{d['f_end']}</b><small class='{"warn" if d['sv_days']>0 else ""}'>{f"+{d['sv_days']}" if d['sv_days']>0 else d['sv_days']} dias de desvio</small></div>
-                <div class='kpi'><span>Em Atraso</span><b class='neg'>{d['late_count']}</b><small>Tarefas fora do prazo</small></div>
+                <!-- AGORA O KPI CARD PUXA A FONTE DA VERDADE DA MATRIZ -->
+                <div class='kpi'><span>Anomalias Ativas</span><b class='neg'>{d['matrix'].get('total', 0)}</b><small>Desvios ou riscos mapeados</small></div>
                 <div class='kpi'><span>% Físico</span><b>{d['pct_phys']:.1f}%</b><small>Avanço de entregas</small></div>
-                <div class='kpi'><span>% Financeiro</span><b>{pct_fin_str}</b><small>Orçamento (AC) consumido</small></div>
+                <div class='kpi'><span>% Financeiro</span><b>{pct_fin_str}</b><small>Orçamento consumido</small></div>
             </div>
             <div class='progress-grid'>
                 <div class='progress-card'><span>Volume de Tarefas Concluídas</span><b>{d['pct_done']:.1f}%</b><div class='bar-bg'><div class='bar-fill' style='width:{d['pct_done']}%'></div></div></div>
@@ -319,7 +315,8 @@ def get_html_template(d):
             </div>
 
             <div class='gantt-tools' style='margin-bottom: 12px; justify-content: flex-start;'>
-                <select id="delayGravFilter" onchange="filterDelayTable()">
+                <!-- FILTRO CASCATA: Alterar a gravidade vai redesenhar as opções do Motivo -->
+                <select id="delayGravFilter" onchange="updateTagFilter()">
                     <option value="all">Todas as Gravidades</option>
                     <option value="critico">🔴 Apenas Incêndio</option>
                     <option value="atencao">🟠 Apenas Atenção</option>
@@ -327,14 +324,6 @@ def get_html_template(d):
                 </select>
                 <select id="delayTagFilter" onchange="filterDelayTable()">
                     <option value="all">Todos os Motivos</option>
-                    <option value="T1">T1: Inércia (Não Iniciou)</option>
-                    <option value="T2">T2: Estouro Real</option>
-                    <option value="T3">T3: Desvio Projetado</option>
-                    <option value="T4">T4: Maquiado</option>
-                    <option value="T5">T5: Absorvido</option>
-                    <option value="T6">T6: Alerta de Ritmo</option>
-                    <option value="T7">T7: Marco Rompido</option>
-                    <option value="T8">T8: Efeito Dominó</option>
                 </select>
             </div>
 
@@ -432,10 +421,8 @@ def get_html_template(d):
         document.querySelectorAll('.gantt-row, .eva-row').forEach(row => {{
             const uid = row.dataset.uid;
             const parentId = row.dataset.parent;
-            
             if (!parentId || parentId === "") {{ row.classList.remove('hidden'); }} 
             else {{ row.classList.toggle('hidden', !isAncestorExpanded(uid)); }}
-            
             if (byUid[uid].children > 0) {{
                 const tgGantt = document.getElementById('tg-'+uid);
                 const tgEva = document.getElementById('tg-eva-'+uid);
@@ -452,40 +439,57 @@ def get_html_template(d):
     function filterGantt(){{
         const q = document.getElementById('search').value.toLowerCase().trim();
         const grav = document.getElementById('gravFilter').value;
-        
         if(!q && grav === "all"){{ renderVisibility(); return; }}
         expandAll();
-        
         document.querySelectorAll('.gantt-row').forEach(row => {{
             const t = byUid[row.dataset.uid];
             const textMatch = (`${{t.name}} ${{t.status}} ${{t.delay_tag}}`).toLowerCase().includes(q);
             const gravMatch = (grav === "all" || row.dataset.grav === grav);
-            
-            if(t.children > 0 && grav !== "all") {{
-                 row.classList.add('hidden'); 
-            }} else {{
-                 row.classList.toggle('hidden', !(textMatch && gravMatch));
-            }}
+            if(t.children > 0 && grav !== "all") {{ row.classList.add('hidden'); }} 
+            else {{ row.classList.toggle('hidden', !(textMatch && gravMatch)); }}
         }});
+    }}
+
+    // MÁGICA DO FILTRO EM CASCATA DA MATRIZ
+    const tagNames = {{
+        'T1': 'T1: Inércia (Não Iniciou)', 'T2': 'T2: Estouro Real', 'T3': 'T3: Desvio Projetado',
+        'T4': 'T4: Maquiado', 'T5': 'T5: Absorvido', 'T6': 'T6: Alerta de Ritmo',
+        'T7': 'T7: Marco Rompido', 'T8': 'T8: Efeito Dominó'
+    }};
+    const gravToTags = {{
+        'all': ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'],
+        'critico': ['T2', 'T7', 'T8'],
+        'atencao': ['T1', 'T3', 'T6'],
+        'auditoria': ['T4', 'T5']
+    }};
+    
+    function updateTagFilter() {{
+        const grav = document.getElementById('delayGravFilter').value;
+        const tagSel = document.getElementById('delayTagFilter');
+        const currentTag = tagSel.value;
+        
+        tagSel.innerHTML = '<option value="all">Todos os Motivos</option>';
+        gravToTags[grav].forEach(t => {{
+            const opt = document.createElement('option');
+            opt.value = t; opt.text = tagNames[t]; tagSel.add(opt);
+        }});
+        
+        if (gravToTags[grav].includes(currentTag)) {{ tagSel.value = currentTag; }} 
+        else {{ tagSel.value = 'all'; }}
+        
+        filterDelayTable();
     }}
 
     function filterDelayTable() {{
         const grav = document.getElementById('delayGravFilter').value;
         const tag = document.getElementById('delayTagFilter').value;
         let count = 0;
-        
         document.querySelectorAll('.delay-tr').forEach(row => {{
             const gravMatch = (grav === "all" || row.dataset.grav === grav);
             const tagMatch = (tag === "all" || row.dataset.tag === tag);
-            
-            if (gravMatch && tagMatch) {{
-                row.classList.remove('hidden');
-                count++;
-            }} else {{
-                row.classList.add('hidden');
-            }}
+            if (gravMatch && tagMatch) {{ row.classList.remove('hidden'); count++; }} 
+            else {{ row.classList.add('hidden'); }}
         }});
-
         const msgRow = document.getElementById('no-delay-msg');
         if(msgRow) msgRow.style.display = (count === 0) ? '' : 'none';
     }}
@@ -493,21 +497,19 @@ def get_html_template(d):
     function showDetail(uid){{
         const t=byUid[String(uid)]; 
         const children=tasks.filter(x=>x.parent===String(uid));
-        
         document.getElementById('modalTitle').textContent=`${{t.name}}`;
         document.getElementById('modalSub').textContent=`Status: ${{t.status}}`;
-        
         const grid=[['Início Baseline',t.b_start],['Fim Baseline',t.b_finish],['Início Atual',t.start],['Fim Atual',t.finish],['% Concluído',`${{t.pct}}%`],['Variação Prazo (SV)',`${{t.svd>0?'+':''}}${{t.svd}} dias`]];
         document.getElementById('modalGrid').innerHTML=grid.map(([k,v])=>`<div class='detail-box'><div class='detail-label'>${{k}}</div><div class='detail-value'>${{v}}</div></div>`).join('');
-        
         document.getElementById('modalChildren').innerHTML=children.length?`<b style="font-size:16px">Subtarefas desta Fase</b><div style="margin-top:12px; display:grid; gap:8px;">${{children.map(c=>`<div style="background:#f8fafc; padding:10px 14px; border-radius:8px; font-size:13px; border:1px solid #e2e8f0; display:flex; justify-content:space-between"><span>${{c.name}}</span> <b>${{c.pct}}%</b></div>`).join('')}}</div>`:'<i>Esta é uma tarefa de trabalho folha (sem subtarefas associadas).</i>';
-        
         document.getElementById('modalBackdrop').classList.add('flex');
     }}
     
     function hideModal(){{document.getElementById('modalBackdrop').classList.remove('flex');}}
     function closeModal(e){{if(e.target.id==='modalBackdrop')hideModal();}}
     
+    // Inicializações
+    updateTagFilter(); 
     collapseAll();
     </script></body></html>"""
 
